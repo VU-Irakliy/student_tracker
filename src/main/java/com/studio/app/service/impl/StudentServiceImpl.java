@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -98,9 +99,12 @@ public class StudentServiceImpl implements StudentService {
         weeklyScheduleRepository.findByStudentIdAndDeletedFalse(id)
                 .forEach(schedule -> schedule.setDeleted(true));
 
-        // Soft-delete all class sessions
+        // Soft-delete only future class sessions; past sessions are kept as historical records
+        var today = LocalDate.now();
         classSessionRepository
                 .findByStudentIdAndDeletedFalseOrderByClassDateAscStartTimeAsc(id)
+                .stream()
+                .filter(session -> session.getClassDate().isAfter(today))
                 .forEach(session -> session.setDeleted(true));
 
         // Soft-delete all payers

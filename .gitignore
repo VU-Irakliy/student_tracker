@@ -54,4 +54,5 @@ pgdata/
 # --- Environment ---
 .env
 *.env
+!.env.example
 

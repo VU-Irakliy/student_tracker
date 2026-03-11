@@ -2,6 +2,7 @@ package com.studio.app;
 
 import com.studio.app.dto.request.CreateStudentRequest;
 import com.studio.app.dto.request.UpdateStudentRequest;
+import com.studio.app.entity.ClassSession;
 import com.studio.app.entity.Student;
 import com.studio.app.enums.PricingType;
 import com.studio.app.enums.StudioTimezone;
@@ -9,6 +10,7 @@ import com.studio.app.exception.ConflictException;
 import com.studio.app.exception.ResourceNotFoundException;
 import com.studio.app.mapper.StudentMapper;
 import com.studio.app.repository.ClassSessionRepository;
+import com.studio.app.repository.PayerRepository;
 import com.studio.app.repository.StudentRepository;
 import com.studio.app.repository.WeeklyScheduleRepository;
 import com.studio.app.service.impl.StudentServiceImpl;
@@ -20,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -33,6 +36,7 @@ class StudentServiceImplTest {
     @Mock StudentRepository studentRepository;
     @Mock WeeklyScheduleRepository weeklyScheduleRepository;
     @Mock ClassSessionRepository classSessionRepository;
+    @Mock PayerRepository payerRepository;
     @Mock StudentMapper studentMapper;
 
     @InjectMocks StudentServiceImpl studentService;
@@ -97,15 +101,37 @@ class StudentServiceImplTest {
     }
 
     @Test
-    void deleteStudent_shouldSoftDeleteStudentAndAssociatedData() {
+    void deleteStudent_shouldSoftDeleteFutureSessionsOnly() {
+        var pastSession = ClassSession.builder()
+                .id(10L)
+                .student(activeStudent)
+                .classDate(LocalDate.now().minusDays(3))
+                .build();
+
+        var todaySession = ClassSession.builder()
+                .id(11L)
+                .student(activeStudent)
+                .classDate(LocalDate.now())
+                .build();
+
+        var futureSession = ClassSession.builder()
+                .id(12L)
+                .student(activeStudent)
+                .classDate(LocalDate.now().plusDays(7))
+                .build();
+
         when(studentRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(activeStudent));
         when(weeklyScheduleRepository.findByStudentIdAndDeletedFalse(1L)).thenReturn(List.of());
         when(classSessionRepository.findByStudentIdAndDeletedFalseOrderByClassDateAscStartTimeAsc(1L))
-                .thenReturn(List.of());
+                .thenReturn(List.of(pastSession, todaySession, futureSession));
+        when(payerRepository.findByStudentIdAndDeletedFalse(1L)).thenReturn(List.of());
 
         studentService.deleteStudent(1L);
 
         assertThat(activeStudent.isDeleted()).isTrue();
+        assertThat(pastSession.isDeleted()).isFalse();
+        assertThat(todaySession.isDeleted()).isFalse();
+        assertThat(futureSession.isDeleted()).isTrue();
         verify(studentRepository).save(activeStudent);
     }
 

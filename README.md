@@ -248,7 +248,7 @@ Server: `http://localhost:8080`
 | Cancel + package                  | Package slot returned (`classesRemaining + 1`)                        |
 | Cancel payment for paid session   | Reverts to UNPAID (PER_CLASS) or returns slot (PACKAGE)              |
 | Assign package to session         | Automatic: `/pay` detects PACKAGE pricing and deducts from oldest active package (FIFO) |
-| Student leaves (soft delete)      | Student + all schedules + all sessions soft-deleted                   |
+| Student leaves (soft delete)      | Student + schedules + payers soft-deleted; only **future** sessions are deleted — past sessions are kept as historical records |
 | Price capture                     | `priceCharged` copied from student at session creation time           |
 
 ---
