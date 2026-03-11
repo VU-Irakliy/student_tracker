@@ -20,7 +20,7 @@ import java.util.List;
  * are also soft-deleted.
  */
 @Entity
-@Table(name = "students")
+@Table(name = "students", schema = "studio")
 @Getter
 @Setter
 @NoArgsConstructor

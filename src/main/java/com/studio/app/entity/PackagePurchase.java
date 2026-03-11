@@ -18,7 +18,7 @@ import java.time.LocalDate;
  * the teacher accepts whatever the student pays and records it here.
  */
 @Entity
-@Table(name = "package_purchases")
+@Table(name = "package_purchases", schema = "studio")
 @Getter
 @Setter
 @NoArgsConstructor

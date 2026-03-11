@@ -17,7 +17,7 @@ import java.time.LocalTime;
  * <p>Soft-deleted when the schedule day is removed or the student leaves.
  */
 @Entity
-@Table(name = "weekly_schedules")
+@Table(name = "weekly_schedules", schema = "studio")
 @Getter
 @Setter
 @NoArgsConstructor

@@ -13,7 +13,7 @@ import lombok.*;
  * <p>Soft-deleted along with the student when the student leaves.
  */
 @Entity
-@Table(name = "payers")
+@Table(name = "payers", schema = "studio")
 @Getter
 @Setter
 @NoArgsConstructor

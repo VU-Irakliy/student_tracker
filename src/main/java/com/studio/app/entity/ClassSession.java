@@ -30,7 +30,7 @@ import java.time.LocalTime;
  * </ul>
  */
 @Entity
-@Table(name = "class_sessions")
+@Table(name = "class_sessions", schema = "studio")
 @Getter
 @Setter
 @NoArgsConstructor
