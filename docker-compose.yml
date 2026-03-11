@@ -1,0 +1,16 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: studio-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: studio_db
+      POSTGRES_USER: studio_user
+      POSTGRES_PASSWORD: studio_pass
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+

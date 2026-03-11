@@ -64,11 +64,17 @@ src/main/java/com/studio/app/
 
 ## Running the App
 
-### 1. Set up PostgreSQL
-```sql
-CREATE DATABASE studio_db;
-CREATE USER studio_user WITH PASSWORD 'studio_pass';
-GRANT ALL PRIVILEGES ON DATABASE studio_db TO studio_user;
+### 1. Start PostgreSQL (Docker — data stored in `./pgdata`)
+```bash
+docker compose up -d
+```
+This creates a local PostgreSQL 17 instance whose data lives inside the project's `pgdata/` folder
+(already git-ignored). The database, user, and password are pre-configured to match `application.properties`.
+
+To stop the database:
+```bash
+docker compose down        # keeps data in pgdata/
+docker compose down -v     # also removes pgdata/ contents
 ```
 
 ### 2. Configure (edit if needed)

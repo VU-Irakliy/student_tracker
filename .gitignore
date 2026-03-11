@@ -48,6 +48,9 @@ desktop.ini
 *.log
 logs/
 
+# --- PostgreSQL local data ---
+pgdata/
+
 # --- Environment ---
 .env
 *.env
