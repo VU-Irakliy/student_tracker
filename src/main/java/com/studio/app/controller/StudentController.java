@@ -1,5 +1,6 @@
 package com.studio.app.controller;
 
+import com.studio.app.constant.ApiConstants;
 import com.studio.app.dto.request.CreateStudentRequest;
 import com.studio.app.dto.request.UpdateStudentRequest;
 import com.studio.app.dto.response.StudentResponse;
@@ -17,7 +18,7 @@ import java.util.List;
  * Base path: {@code /api/students}
  */
 @RestController
-@RequestMapping("/api/students")
+@RequestMapping(ApiConstants.STUDENTS)
 @RequiredArgsConstructor
 public class StudentController {
 

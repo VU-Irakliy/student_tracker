@@ -1,5 +1,6 @@
 package com.studio.app.controller;
 
+import com.studio.app.constant.ApiConstants;
 import com.studio.app.dto.request.OneOffSessionRequest;
 import com.studio.app.dto.response.ClassSessionResponse;
 import com.studio.app.enums.PaymentStatus;
@@ -21,7 +22,7 @@ import java.util.List;
  */
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/students")
+@RequestMapping(ApiConstants.STUDENTS)
 public class StudentSessionController {
 
     private final ClassSessionService sessionService;

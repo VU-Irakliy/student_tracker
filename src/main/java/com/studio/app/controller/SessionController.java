@@ -1,5 +1,6 @@
 package com.studio.app.controller;
 
+import com.studio.app.constant.ApiConstants;
 import com.studio.app.dto.request.CancelSessionRequest;
 import com.studio.app.dto.request.MovePaymentRequest;
 import com.studio.app.dto.request.PaySessionRequest;
@@ -17,7 +18,7 @@ import org.springframework.web.bind.annotation.*;
  */
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/sessions")
+@RequestMapping(ApiConstants.SESSIONS)
 public class SessionController {
 
     private final ClassSessionService sessionService;

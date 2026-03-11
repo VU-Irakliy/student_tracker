@@ -1,5 +1,6 @@
 package com.studio.app.controller;
 
+import com.studio.app.constant.ApiConstants;
 import com.studio.app.dto.request.WeeklyScheduleRequest;
 import com.studio.app.dto.response.WeeklyScheduleResponse;
 import com.studio.app.service.ScheduleService;
@@ -16,7 +17,7 @@ import java.util.List;
  * Base path: {@code /api/students}
  */
 @RestController
-@RequestMapping("/api/students")
+@RequestMapping(ApiConstants.STUDENTS)
 @RequiredArgsConstructor
 public class ScheduleController {
 

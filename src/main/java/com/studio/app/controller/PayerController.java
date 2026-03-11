@@ -1,5 +1,6 @@
 package com.studio.app.controller;
 
+import com.studio.app.constant.ApiConstants;
 import com.studio.app.dto.request.PayerRequest;
 import com.studio.app.dto.response.PayerResponse;
 import com.studio.app.service.PayerService;
@@ -20,7 +21,7 @@ import java.util.List;
  * <p>Base path: {@code /api/students}
  */
 @RestController
-@RequestMapping("/api/students")
+@RequestMapping(ApiConstants.STUDENTS)
 @RequiredArgsConstructor
 public class PayerController {
 

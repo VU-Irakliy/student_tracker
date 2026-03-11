@@ -1,5 +1,6 @@
 package com.studio.app.controller;
 
+import com.studio.app.constant.ApiConstants;
 import com.studio.app.dto.response.CalendarDayResponse;
 import com.studio.app.service.ClassSessionService;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +18,7 @@ import java.util.List;
  */
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/calendar")
+@RequestMapping(ApiConstants.CALENDAR)
 public class CalendarController {
 
     private final ClassSessionService sessionService;
