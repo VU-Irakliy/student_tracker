@@ -56,4 +56,6 @@ public class WeeklySchedule extends BaseEntity {
      */
     @Column(name = "effective_from_epoch_day")
     private Long effectiveFromEpochDay;
+
+
 }

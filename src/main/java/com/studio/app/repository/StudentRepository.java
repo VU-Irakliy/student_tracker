@@ -21,8 +21,6 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
     /** Finds a non-deleted student by ID. */
     Optional<Student> findByIdAndDeletedFalse(Long id);
 
-    /** Checks whether a non-deleted student with the given email exists. */
-    boolean existsByEmailAndDeletedFalse(String email);
 
     /** Finds non-deleted students whose name contains the given query (case-insensitive). */
     @Query("""

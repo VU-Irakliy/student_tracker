@@ -2,19 +2,24 @@ package com.studio.app;
 
 import com.studio.app.dto.request.CreateStudentRequest;
 import com.studio.app.dto.request.UpdateStudentRequest;
+import com.studio.app.dto.response.StudentResponse;
 import com.studio.app.entity.ClassSession;
+import com.studio.app.entity.Payer;
 import com.studio.app.entity.Student;
+import com.studio.app.entity.WeeklySchedule;
+import com.studio.app.enums.Currency;
 import com.studio.app.enums.PricingType;
 import com.studio.app.enums.StudioTimezone;
-import com.studio.app.exception.ConflictException;
 import com.studio.app.exception.ResourceNotFoundException;
 import com.studio.app.mapper.StudentMapper;
 import com.studio.app.repository.ClassSessionRepository;
 import com.studio.app.repository.PayerRepository;
 import com.studio.app.repository.StudentRepository;
 import com.studio.app.repository.WeeklyScheduleRepository;
+import com.studio.app.service.CurrencyConversionService;
 import com.studio.app.service.impl.StudentServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -22,8 +27,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
@@ -38,10 +47,12 @@ class StudentServiceImplTest {
     @Mock ClassSessionRepository classSessionRepository;
     @Mock PayerRepository payerRepository;
     @Mock StudentMapper studentMapper;
+    @Mock CurrencyConversionService currencyConversionService;
 
     @InjectMocks StudentServiceImpl studentService;
 
     private Student activeStudent;
+    private StudentResponse studentResponse;
 
     @BeforeEach
     void setUp() {
@@ -49,105 +60,342 @@ class StudentServiceImplTest {
                 .id(1L)
                 .firstName("Ana")
                 .lastName("García")
-                .email("ana@studio.com")
                 .pricingType(PricingType.PER_CLASS)
                 .pricePerClass(new BigDecimal("30.00"))
+                .currency(Currency.EUROS)
                 .timezone(StudioTimezone.SPAIN)
                 .build();
-    }
 
-    @Test
-    void createStudent_shouldPersistAndReturn() {
-        var request = CreateStudentRequest.builder()
-                .firstName("Ana").lastName("García")
-                .email("ana@studio.com")
+        studentResponse = StudentResponse.builder()
+                .id(1L)
+                .firstName("Ana")
+                .lastName("García")
+                .fullName("Ana García")
                 .pricingType(PricingType.PER_CLASS)
                 .pricePerClass(new BigDecimal("30.00"))
-                .timezone(StudioTimezone.SPAIN)
+                .currency(Currency.EUROS)
                 .build();
-
-        when(studentRepository.existsByEmailAndDeletedFalse("ana@studio.com")).thenReturn(false);
-        when(studentRepository.save(any())).thenReturn(activeStudent);
-        when(studentMapper.toResponse(activeStudent)).thenReturn(null);
-
-        studentService.createStudent(request);
-
-        verify(studentRepository).save(any(Student.class));
     }
 
-    @Test
-    void createStudent_shouldThrowConflict_whenEmailExists() {
-        var request = CreateStudentRequest.builder()
-                .firstName("Ana").lastName("García")
-                .email("ana@studio.com")
-                .pricingType(PricingType.PER_CLASS)
-                .timezone(StudioTimezone.SPAIN)
-                .build();
+    @Nested
+    class CreateStudent {
 
-        when(studentRepository.existsByEmailAndDeletedFalse("ana@studio.com")).thenReturn(true);
+        @Test
+        void shouldPersistAndReturn() {
+            var request = CreateStudentRequest.builder()
+                    .firstName("Ana").lastName("García")
+                    .pricingType(PricingType.PER_CLASS)
+                    .pricePerClass(new BigDecimal("30.00"))
+                    .currency(Currency.EUROS)
+                    .timezone(StudioTimezone.SPAIN)
+                    .build();
 
-        assertThatThrownBy(() -> studentService.createStudent(request))
-                .isInstanceOf(ConflictException.class)
-                .hasMessageContaining("Email already in use");
+            when(studentRepository.save(any())).thenReturn(activeStudent);
+            when(studentMapper.toResponse(activeStudent)).thenReturn(studentResponse);
+            when(currencyConversionService.convertToAll(any(), any())).thenReturn(Collections.emptyMap());
+
+            var result = studentService.createStudent(request);
+
+            verify(studentRepository).save(any(Student.class));
+            assertThat(result.getFirstName()).isEqualTo("Ana");
+        }
+
+        @Test
+        void shouldSetCurrencyFromRequest() {
+            var request = CreateStudentRequest.builder()
+                    .firstName("Ivan").lastName("Petrov")
+                    .pricingType(PricingType.PER_CLASS)
+                    .pricePerClass(new BigDecimal("2000.00"))
+                    .currency(Currency.RUBLES)
+                    .timezone(StudioTimezone.RUSSIA_MOSCOW)
+                    .build();
+
+            var rubStudent = Student.builder()
+                    .id(2L).firstName("Ivan").lastName("Petrov")
+                    .currency(Currency.RUBLES).pricePerClass(new BigDecimal("2000.00"))
+                    .pricingType(PricingType.PER_CLASS).timezone(StudioTimezone.RUSSIA_MOSCOW)
+                    .build();
+
+            var rubResponse = StudentResponse.builder()
+                    .pricePerClass(new BigDecimal("2000.00"))
+                    .currency(Currency.RUBLES)
+                    .build();
+
+            when(studentRepository.save(any())).thenReturn(rubStudent);
+            when(studentMapper.toResponse(rubStudent)).thenReturn(rubResponse);
+            when(currencyConversionService.convertToAll(any(), eq(Currency.RUBLES)))
+                    .thenReturn(Map.of(
+                            Currency.RUBLES, new BigDecimal("2000.00"),
+                            Currency.DOLLARS, new BigDecimal("21.60"),
+                            Currency.EUROS, new BigDecimal("19.80")
+                    ));
+
+            var result = studentService.createStudent(request);
+
+            assertThat(result.getConvertedPrices()).containsKey(Currency.DOLLARS);
+        }
+
+        @Test
+        void shouldAllowNullPriceForPackageStudent() {
+            var request = CreateStudentRequest.builder()
+                    .firstName("Pkg").lastName("Student")
+                    .pricingType(PricingType.PACKAGE)
+                    .timezone(StudioTimezone.SPAIN)
+                    .build();
+
+            var pkgStudent = Student.builder()
+                    .id(3L).firstName("Pkg").lastName("Student")
+                    .pricingType(PricingType.PACKAGE).timezone(StudioTimezone.SPAIN)
+                    .build();
+
+            var pkgResponse = StudentResponse.builder()
+                    .pricingType(PricingType.PACKAGE).build();
+
+            when(studentRepository.save(any())).thenReturn(pkgStudent);
+            when(studentMapper.toResponse(pkgStudent)).thenReturn(pkgResponse);
+
+            var result = studentService.createStudent(request);
+
+            assertThat(result.getConvertedPrices()).isNull();
+        }
     }
 
-    @Test
-    void getStudentById_shouldThrowNotFound_whenDeleted() {
-        when(studentRepository.findByIdAndDeletedFalse(99L)).thenReturn(Optional.empty());
+    @Nested
+    class GetStudent {
 
-        assertThatThrownBy(() -> studentService.getStudentById(99L))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("Student not found with id: 99");
+        @Test
+        void getById_shouldReturnStudent() {
+            when(studentRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(activeStudent));
+            when(studentMapper.toResponse(activeStudent)).thenReturn(studentResponse);
+            when(currencyConversionService.convertToAll(any(), any())).thenReturn(Collections.emptyMap());
+
+            var result = studentService.getStudentById(1L);
+
+            assertThat(result.getFirstName()).isEqualTo("Ana");
+        }
+
+        @Test
+        void getById_shouldThrowNotFound_whenDeleted() {
+            when(studentRepository.findByIdAndDeletedFalse(99L)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> studentService.getStudentById(99L))
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining("Student not found with id: 99");
+        }
+
+        @Test
+        void getAllStudents_shouldReturnOnlyActive() {
+            when(studentRepository.findAllByDeletedFalse()).thenReturn(List.of(activeStudent));
+            when(studentMapper.toResponseList(List.of(activeStudent)))
+                    .thenReturn(List.of(studentResponse));
+            when(currencyConversionService.convertToAll(any(), any())).thenReturn(Collections.emptyMap());
+
+            var result = studentService.getAllStudents();
+
+            assertThat(result).hasSize(1);
+        }
+
+        @Test
+        void searchStudents_shouldDelegateToRepository() {
+            when(studentRepository.searchByName("Ana")).thenReturn(List.of(activeStudent));
+            when(studentMapper.toResponseList(List.of(activeStudent)))
+                    .thenReturn(List.of(studentResponse));
+            when(currencyConversionService.convertToAll(any(), any())).thenReturn(Collections.emptyMap());
+
+            var result = studentService.searchStudents("Ana");
+
+            assertThat(result).hasSize(1);
+            verify(studentRepository).searchByName("Ana");
+        }
     }
 
-    @Test
-    void deleteStudent_shouldSoftDeleteFutureSessionsOnly() {
-        var pastSession = ClassSession.builder()
-                .id(10L)
-                .student(activeStudent)
-                .classDate(LocalDate.now().minusDays(3))
-                .build();
+    @Nested
+    class UpdateStudent {
 
-        var todaySession = ClassSession.builder()
-                .id(11L)
-                .student(activeStudent)
-                .classDate(LocalDate.now())
-                .build();
+        @Test
+        void shouldApplyOnlyNonNullFields() {
+            when(studentRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(activeStudent));
+            when(studentRepository.save(any())).thenReturn(activeStudent);
+            when(studentMapper.toResponse(activeStudent)).thenReturn(studentResponse);
+            when(currencyConversionService.convertToAll(any(), any())).thenReturn(Collections.emptyMap());
 
-        var futureSession = ClassSession.builder()
-                .id(12L)
-                .student(activeStudent)
-                .classDate(LocalDate.now().plusDays(7))
-                .build();
+            var request = UpdateStudentRequest.builder()
+                    .firstName("Anita")
+                    .build();
 
-        when(studentRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(activeStudent));
-        when(weeklyScheduleRepository.findByStudentIdAndDeletedFalse(1L)).thenReturn(List.of());
-        when(classSessionRepository.findByStudentIdAndDeletedFalseOrderByClassDateAscStartTimeAsc(1L))
-                .thenReturn(List.of(pastSession, todaySession, futureSession));
-        when(payerRepository.findByStudentIdAndDeletedFalse(1L)).thenReturn(List.of());
+            studentService.updateStudent(1L, request);
 
-        studentService.deleteStudent(1L);
+            assertThat(activeStudent.getFirstName()).isEqualTo("Anita");
+            assertThat(activeStudent.getLastName()).isEqualTo("García");
+        }
 
-        assertThat(activeStudent.isDeleted()).isTrue();
-        assertThat(pastSession.isDeleted()).isFalse();
-        assertThat(todaySession.isDeleted()).isFalse();
-        assertThat(futureSession.isDeleted()).isTrue();
-        verify(studentRepository).save(activeStudent);
+        @Test
+        void shouldUpdateCurrency() {
+            when(studentRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(activeStudent));
+            when(studentRepository.save(any())).thenReturn(activeStudent);
+            when(studentMapper.toResponse(activeStudent)).thenReturn(
+                    StudentResponse.builder()
+                            .pricePerClass(new BigDecimal("30.00"))
+                            .currency(Currency.DOLLARS)
+                            .build());
+            when(currencyConversionService.convertToAll(any(), any())).thenReturn(Collections.emptyMap());
+
+            studentService.updateStudent(1L, UpdateStudentRequest.builder()
+                    .currency(Currency.DOLLARS).build());
+
+            assertThat(activeStudent.getCurrency()).isEqualTo(Currency.DOLLARS);
+        }
+
+        @Test
+        void shouldUpdatePricePerClass() {
+            when(studentRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(activeStudent));
+            when(studentRepository.save(any())).thenReturn(activeStudent);
+            when(studentMapper.toResponse(activeStudent)).thenReturn(
+                    StudentResponse.builder()
+                            .pricePerClass(new BigDecimal("50.00"))
+                            .currency(Currency.EUROS)
+                            .build());
+            when(currencyConversionService.convertToAll(any(), any())).thenReturn(Collections.emptyMap());
+
+            studentService.updateStudent(1L, UpdateStudentRequest.builder()
+                    .pricePerClass(new BigDecimal("50.00")).build());
+
+            assertThat(activeStudent.getPricePerClass()).isEqualByComparingTo("50.00");
+        }
+
+        @Test
+        void shouldUpdatePricingType() {
+            when(studentRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(activeStudent));
+            when(studentRepository.save(any())).thenReturn(activeStudent);
+            when(studentMapper.toResponse(activeStudent)).thenReturn(
+                    StudentResponse.builder().pricingType(PricingType.PACKAGE).build());
+
+            studentService.updateStudent(1L, UpdateStudentRequest.builder()
+                    .pricingType(PricingType.PACKAGE).build());
+
+            assertThat(activeStudent.getPricingType()).isEqualTo(PricingType.PACKAGE);
+        }
+
+        @Test
+        void shouldUpdateTimezone() {
+            when(studentRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(activeStudent));
+            when(studentRepository.save(any())).thenReturn(activeStudent);
+            when(studentMapper.toResponse(activeStudent)).thenReturn(
+                    StudentResponse.builder().build());
+
+            studentService.updateStudent(1L, UpdateStudentRequest.builder()
+                    .timezone(StudioTimezone.RUSSIA_MOSCOW).build());
+
+            assertThat(activeStudent.getTimezone()).isEqualTo(StudioTimezone.RUSSIA_MOSCOW);
+        }
+
+        @Test
+        void shouldUpdateNotes() {
+            when(studentRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(activeStudent));
+            when(studentRepository.save(any())).thenReturn(activeStudent);
+            when(studentMapper.toResponse(activeStudent)).thenReturn(
+                    StudentResponse.builder().build());
+
+            studentService.updateStudent(1L, UpdateStudentRequest.builder()
+                    .notes("Updated note").build());
+
+            assertThat(activeStudent.getNotes()).isEqualTo("Updated note");
+        }
+
+        @Test
+        void shouldThrowNotFound_whenStudentMissing() {
+            when(studentRepository.findByIdAndDeletedFalse(99L)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> studentService.updateStudent(99L,
+                    UpdateStudentRequest.builder().firstName("X").build()))
+                    .isInstanceOf(ResourceNotFoundException.class);
+        }
     }
 
-    @Test
-    void updateStudent_shouldApplyOnlyNonNullFields() {
-        when(studentRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(activeStudent));
-        when(studentRepository.save(any())).thenReturn(activeStudent);
-        when(studentMapper.toResponse(activeStudent)).thenReturn(null);
+    @Nested
+    class DeleteStudent {
 
-        var request = UpdateStudentRequest.builder()
-                .firstName("Anita")
-                .build();
+        @Test
+        void shouldSoftDeleteFutureSessionsOnly() {
+            var pastSession = ClassSession.builder()
+                    .id(10L).student(activeStudent)
+                    .classDate(LocalDate.now().minusDays(3))
+                    .startTime(LocalTime.of(10, 0))
+                    .durationMinutes(60)
+                    .build();
 
-        studentService.updateStudent(1L, request);
+            var todaySession = ClassSession.builder()
+                    .id(11L).student(activeStudent)
+                    .classDate(LocalDate.now())
+                    .startTime(LocalTime.of(10, 0))
+                    .durationMinutes(60)
+                    .build();
 
-        assertThat(activeStudent.getFirstName()).isEqualTo("Anita");
-        assertThat(activeStudent.getLastName()).isEqualTo("García"); // unchanged
+            var futureSession = ClassSession.builder()
+                    .id(12L).student(activeStudent)
+                    .classDate(LocalDate.now().plusDays(7))
+                    .startTime(LocalTime.of(10, 0))
+                    .durationMinutes(60)
+                    .build();
+
+            when(studentRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(activeStudent));
+            when(weeklyScheduleRepository.findByStudentIdAndDeletedFalse(1L)).thenReturn(List.of());
+            when(classSessionRepository.findByStudentIdAndDeletedFalseOrderByClassDateAscStartTimeAsc(1L))
+                    .thenReturn(List.of(pastSession, todaySession, futureSession));
+            when(payerRepository.findByStudentIdAndDeletedFalse(1L)).thenReturn(List.of());
+
+            studentService.deleteStudent(1L);
+
+            assertThat(activeStudent.isDeleted()).isTrue();
+            assertThat(pastSession.isDeleted()).isFalse();
+            assertThat(todaySession.isDeleted()).isFalse();
+            assertThat(futureSession.isDeleted()).isTrue();
+            verify(studentRepository).save(activeStudent);
+        }
+
+        @Test
+        void shouldSoftDeleteWeeklySchedules() {
+            var schedule = WeeklySchedule.builder()
+                    .id(1L).student(activeStudent)
+                    .dayOfWeek(DayOfWeek.MONDAY)
+                    .startTime(LocalTime.of(10, 0))
+                    .durationMinutes(60)
+                    .build();
+
+            when(studentRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(activeStudent));
+            when(weeklyScheduleRepository.findByStudentIdAndDeletedFalse(1L)).thenReturn(List.of(schedule));
+            when(classSessionRepository.findByStudentIdAndDeletedFalseOrderByClassDateAscStartTimeAsc(1L))
+                    .thenReturn(List.of());
+            when(payerRepository.findByStudentIdAndDeletedFalse(1L)).thenReturn(List.of());
+
+            studentService.deleteStudent(1L);
+
+            assertThat(schedule.isDeleted()).isTrue();
+        }
+
+        @Test
+        void shouldSoftDeletePayers() {
+            var payer = Payer.builder()
+                    .id(1L).student(activeStudent)
+                    .fullName("Parent").build();
+
+            when(studentRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(activeStudent));
+            when(weeklyScheduleRepository.findByStudentIdAndDeletedFalse(1L)).thenReturn(List.of());
+            when(classSessionRepository.findByStudentIdAndDeletedFalseOrderByClassDateAscStartTimeAsc(1L))
+                    .thenReturn(List.of());
+            when(payerRepository.findByStudentIdAndDeletedFalse(1L)).thenReturn(List.of(payer));
+
+            studentService.deleteStudent(1L);
+
+            assertThat(payer.isDeleted()).isTrue();
+        }
+
+        @Test
+        void shouldThrowNotFound_whenStudentMissing() {
+            when(studentRepository.findByIdAndDeletedFalse(99L)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> studentService.deleteStudent(99L))
+                    .isInstanceOf(ResourceNotFoundException.class);
+        }
     }
 }

@@ -49,8 +49,8 @@ class WeeklyScheduleRepositoryTest {
                 .dayOfWeek(DayOfWeek.FRIDAY)
                 .startTime(LocalTime.of(14, 0))
                 .durationMinutes(45)
-                .deleted(true)
                 .build();
+        deleted.setDeleted(true);
         em.persistAndFlush(deleted);
     }
 

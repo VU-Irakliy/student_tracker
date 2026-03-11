@@ -13,10 +13,10 @@ CREATE TABLE IF NOT EXISTS studio.students (
     id              BIGSERIAL       PRIMARY KEY,
     first_name      VARCHAR(255)    NOT NULL,
     last_name       VARCHAR(255)    NOT NULL,
-    email           VARCHAR(255)    UNIQUE,
     phone_number    VARCHAR(255),
     pricing_type    VARCHAR(50)     NOT NULL,              -- PER_CLASS | PACKAGE
     price_per_class NUMERIC(10, 2),
+    currency        VARCHAR(50),                           -- DOLLARS | EUROS | RUBLES
     timezone        VARCHAR(50)     NOT NULL,              -- StudioTimezone enum
     notes           TEXT,
     created_at      TIMESTAMP       NOT NULL DEFAULT NOW(),

@@ -1,5 +1,6 @@
 package com.studio.app.dto.request;
 
+import com.studio.app.enums.Currency;
 import com.studio.app.enums.PricingType;
 import com.studio.app.enums.StudioTimezone;
 import jakarta.validation.constraints.*;
@@ -23,8 +24,6 @@ public class CreateStudentRequest {
     @NotBlank(message = "Last name is required")
     private String lastName;
 
-    @Email(message = "Invalid email format")
-    private String email;
 
     private String phoneNumber;
 
@@ -37,6 +36,11 @@ public class CreateStudentRequest {
      */
     @DecimalMin(value = "0.01", message = "Price per class must be positive")
     private BigDecimal pricePerClass;
+
+    /**
+     * Currency of the price. Required when {@code pricePerClass} is set.
+     */
+    private Currency currency;
 
     @NotNull(message = "Timezone is required")
     private StudioTimezone timezone;

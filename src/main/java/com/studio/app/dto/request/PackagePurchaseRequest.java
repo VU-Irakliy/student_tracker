@@ -1,5 +1,6 @@
 package com.studio.app.dto.request;
 
+import com.studio.app.enums.Currency;
 import jakarta.validation.constraints.*;
 import lombok.*;
 
@@ -26,6 +27,9 @@ public class PackagePurchaseRequest {
     @NotNull(message = "Amount paid is required")
     @DecimalMin(value = "0.00", message = "Amount paid cannot be negative")
     private BigDecimal amountPaid;
+
+    /** Optional currency override. Defaults to the student's currency if not provided. */
+    private Currency currency;
 
     @NotNull(message = "Payment date is required")
     private LocalDate paymentDate;

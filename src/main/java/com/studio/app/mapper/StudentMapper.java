@@ -24,6 +24,7 @@ public interface StudentMapper {
     @Mapping(target = "fullName", expression = "java(student.getFirstName() + \" \" + student.getLastName())")
     @Mapping(target = "weeklySchedules", source = "weeklySchedules")
     @Mapping(target = "payers", source = "payers")
+    @Mapping(target = "convertedPrices", ignore = true)
     StudentResponse toResponse(Student student);
 
     List<StudentResponse> toResponseList(List<Student> students);

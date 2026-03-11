@@ -58,7 +58,7 @@ public interface StudentApi {
      * @return the updated {@link StudentResponse}
      */
     @Operation(summary = "Update a student", description = "Partially updates a student. Only non-null fields are applied.")
-    @PostMapping("/{id}")
+    @PutMapping("/{id}")
     ResponseEntity<StudentResponse> updateStudent(@PathVariable Long id, @Valid @RequestBody UpdateStudentRequest request);
 
     /**
@@ -69,6 +69,6 @@ public interface StudentApi {
      * @return 204 No Content on success
      */
     @Operation(summary = "Delete a student", description = "Soft-deletes a student, their schedules, payers, and future sessions. Past sessions are preserved.")
-    @PostMapping("/{id}/delete")
+    @DeleteMapping("/{id}")
     ResponseEntity<Void> deleteStudent(@PathVariable Long id);
 }

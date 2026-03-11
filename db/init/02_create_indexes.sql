@@ -10,9 +10,6 @@ SET search_path TO studio;
 CREATE INDEX IF NOT EXISTS idx_students_deleted
     ON studio.students (deleted);
 
-CREATE INDEX IF NOT EXISTS idx_students_email
-    ON studio.students (email)
-    WHERE deleted = FALSE;
 
 -- ── weekly_schedules ────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_weekly_schedules_student

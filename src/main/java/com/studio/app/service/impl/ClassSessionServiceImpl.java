@@ -17,6 +17,7 @@ import com.studio.app.repository.ClassSessionRepository;
 import com.studio.app.repository.PackagePurchaseRepository;
 import com.studio.app.repository.StudentRepository;
 import com.studio.app.service.ClassSessionService;
+import com.studio.app.service.CurrencyConversionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +39,7 @@ public class ClassSessionServiceImpl implements ClassSessionService {
     private final StudentRepository studentRepository;
     private final PackagePurchaseRepository packageRepository;
     private final ClassSessionMapper sessionMapper;
+    private final CurrencyConversionService currencyConversionService;
 
     /** {@inheritDoc} */
     @Override
@@ -51,11 +53,12 @@ public class ClassSessionServiceImpl implements ClassSessionService {
                 .startTime(request.getStartTime())
                 .durationMinutes(request.getDurationMinutes())
                 .priceCharged(student.getPricePerClass())
+                .currency(student.getCurrency())
                 .oneOff(true)
                 .note(request.getNote())
                 .build();
 
-        return sessionMapper.toResponse(sessionRepository.save(session));
+        return enrichWithConvertedPrices(sessionMapper.toResponse(sessionRepository.save(session)));
     }
 
     /** {@inheritDoc} */
@@ -65,14 +68,15 @@ public class ClassSessionServiceImpl implements ClassSessionService {
         var sessions = (from != null && to != null)
                 ? sessionRepository.findByStudentIdAndDateRange(studentId, from, to)
                 : sessionRepository.findByStudentIdAndDeletedFalseOrderByClassDateAscStartTimeAsc(studentId);
-        return sessionMapper.toResponseList(sessions);
+        return sessionMapper.toResponseList(sessions).stream()
+                .map(this::enrichWithConvertedPrices).toList();
     }
 
     /** {@inheritDoc} */
     @Override
     @Transactional(readOnly = true)
     public ClassSessionResponse getSessionById(Long sessionId) {
-        return sessionMapper.toResponse(findActiveSession(sessionId));
+        return enrichWithConvertedPrices(sessionMapper.toResponse(findActiveSession(sessionId)));
     }
 
     /** {@inheritDoc} */
@@ -101,7 +105,7 @@ public class ClassSessionServiceImpl implements ClassSessionService {
             session.setPaymentStatus(PaymentStatus.UNPAID);
         }
 
-        return sessionMapper.toResponse(sessionRepository.save(session));
+        return enrichWithConvertedPrices(sessionMapper.toResponse(sessionRepository.save(session)));
     }
 
     /** {@inheritDoc} */
@@ -134,7 +138,7 @@ public class ClassSessionServiceImpl implements ClassSessionService {
             session.setPaymentStatus(PaymentStatus.PAID);
         }
 
-        return sessionMapper.toResponse(sessionRepository.save(session));
+        return enrichWithConvertedPrices(sessionMapper.toResponse(sessionRepository.save(session)));
     }
 
     /** {@inheritDoc} */
@@ -155,7 +159,7 @@ public class ClassSessionServiceImpl implements ClassSessionService {
         }
 
         session.setPaymentStatus(PaymentStatus.UNPAID);
-        return sessionMapper.toResponse(sessionRepository.save(session));
+        return enrichWithConvertedPrices(sessionMapper.toResponse(sessionRepository.save(session)));
     }
 
     /** {@inheritDoc} */
@@ -180,7 +184,7 @@ public class ClassSessionServiceImpl implements ClassSessionService {
         source.setPaymentStatus(PaymentStatus.UNPAID);
 
         sessionRepository.save(source);
-        return sessionMapper.toResponse(sessionRepository.save(target));
+        return enrichWithConvertedPrices(sessionMapper.toResponse(sessionRepository.save(target)));
     }
 
     /** {@inheritDoc} */
@@ -188,7 +192,8 @@ public class ClassSessionServiceImpl implements ClassSessionService {
     @Transactional(readOnly = true)
     public List<ClassSessionResponse> getSessionsByPaymentStatus(Long studentId, PaymentStatus paymentStatus) {
         return sessionMapper.toResponseList(
-                sessionRepository.findByStudentIdAndPaymentStatusAndDeletedFalse(studentId, paymentStatus));
+                sessionRepository.findByStudentIdAndPaymentStatusAndDeletedFalse(studentId, paymentStatus))
+                .stream().map(this::enrichWithConvertedPrices).toList();
     }
 
 
@@ -205,12 +210,26 @@ public class ClassSessionServiceImpl implements ClassSessionService {
                 .sorted(java.util.Map.Entry.comparingByKey())
                 .map(entry -> CalendarDayResponse.builder()
                         .date(entry.getKey())
-                        .sessions(sessionMapper.toResponseList(entry.getValue()))
+                        .sessions(sessionMapper.toResponseList(entry.getValue()).stream()
+                                .map(this::enrichWithConvertedPrices).toList())
                         .build())
                 .toList();
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────
+
+    /**
+     * Populates the {@code convertedPrices} field on a response by delegating
+     * to the {@link CurrencyConversionService}.
+     */
+    private ClassSessionResponse enrichWithConvertedPrices(ClassSessionResponse response) {
+        if (response.getPriceCharged() != null && response.getCurrency() != null) {
+            response.setConvertedPrices(
+                    currencyConversionService.convertToAll(
+                            response.getPriceCharged(), response.getCurrency()));
+        }
+        return response;
+    }
 
     private ClassSession findActiveSession(Long id) {
         return sessionRepository.findByIdAndDeletedFalse(id)

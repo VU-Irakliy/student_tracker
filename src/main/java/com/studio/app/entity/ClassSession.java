@@ -1,6 +1,7 @@
 package com.studio.app.entity;
 
 import com.studio.app.enums.ClassStatus;
+import com.studio.app.enums.Currency;
 import com.studio.app.enums.PaymentStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -82,6 +83,11 @@ public class ClassSession extends BaseEntity {
      */
     @Column(name = "price_charged", precision = 10, scale = 2)
     private BigDecimal priceCharged;
+
+    /** Currency in which the price was charged. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "currency")
+    private Currency currency;
 
     /**
      * Package purchase this session is deducted from.

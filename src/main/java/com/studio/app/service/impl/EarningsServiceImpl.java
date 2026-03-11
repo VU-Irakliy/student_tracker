@@ -1,0 +1,191 @@
+package com.studio.app.service.impl;
+
+import com.studio.app.dto.response.DailyEarningsResponse;
+import com.studio.app.dto.response.MonthlyEarningsResponse;
+import com.studio.app.entity.ClassSession;
+import com.studio.app.enums.Currency;
+import com.studio.app.repository.ClassSessionRepository;
+import com.studio.app.repository.PackagePurchaseRepository;
+import com.studio.app.service.CurrencyConversionService;
+import com.studio.app.service.EarningsService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.util.*;
+import java.util.stream.Collectors;
+
+/**
+ * Default implementation of {@link EarningsService}.
+ *
+ * <p><b>Daily earnings</b> aggregate only sessions with {@code paymentStatus == PAID}
+ * (i.e. per-class payments). Package-covered sessions are excluded.
+ *
+ * <p><b>Monthly earnings</b> include both per-class session payments <em>and</em>
+ * package purchase payments (matched by {@code paymentDate} within the month).
+ *
+ * <p>Because different students may pay in different currencies, earnings are
+ * grouped by original currency. When a {@code baseCurrency} is requested, all
+ * per-currency subtotals are converted and summed into a single value.
+ * Additionally, a {@code convertedTotals} map shows the grand total expressed
+ * in every supported currency.
+ */
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class EarningsServiceImpl implements EarningsService {
+
+    private final ClassSessionRepository sessionRepository;
+    private final PackagePurchaseRepository packageRepository;
+    private final CurrencyConversionService currencyConversionService;
+
+    /** {@inheritDoc} */
+    @Override
+    public List<DailyEarningsResponse> getDailyEarnings(LocalDate from, LocalDate to, Currency baseCurrency) {
+        var sessions = sessionRepository.findPaidSessionsByDateRange(from, to);
+
+        // Group sessions by date
+        Map<LocalDate, List<ClassSession>> byDate = sessions.stream()
+                .collect(Collectors.groupingBy(ClassSession::getClassDate, TreeMap::new, Collectors.toList()));
+
+        return byDate.entrySet().stream()
+                .map(entry -> buildDailyResponse(entry.getKey(), entry.getValue(), baseCurrency))
+                .toList();
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public MonthlyEarningsResponse getMonthlyEarnings(YearMonth month, Currency baseCurrency) {
+        LocalDate from = month.atDay(1);
+        LocalDate to = month.atEndOfMonth();
+
+        // ── Per-class session earnings ──────────────────────────────────
+        var dailyList = getDailyEarnings(from, to, baseCurrency);
+
+        Map<Currency, BigDecimal> sessionByCurrency = new EnumMap<>(Currency.class);
+        int totalSessions = 0;
+
+        for (var day : dailyList) {
+            totalSessions += day.getSessionCount();
+            day.getEarningsByCurrency().forEach((cur, amt) ->
+                    sessionByCurrency.merge(cur, amt, BigDecimal::add));
+        }
+
+        // ── Package purchase earnings ───────────────────────────────────
+        var packages = packageRepository.findByPaymentDateRange(from, to);
+
+        Map<Currency, BigDecimal> packageByCurrency = new EnumMap<>(Currency.class);
+        for (var pkg : packages) {
+            Currency cur = pkg.getCurrency();
+            BigDecimal paid = pkg.getAmountPaid();
+            if (cur != null && paid != null) {
+                packageByCurrency.merge(cur, paid, BigDecimal::add);
+            }
+        }
+
+        // ── Combined totals ────────────────────────────────────────────
+        Map<Currency, BigDecimal> totalByCurrency = new EnumMap<>(Currency.class);
+        sessionByCurrency.forEach((cur, amt) -> totalByCurrency.merge(cur, amt, BigDecimal::add));
+        packageByCurrency.forEach((cur, amt) -> totalByCurrency.merge(cur, amt, BigDecimal::add));
+
+        BigDecimal totalInBase = computeTotalInBaseCurrency(totalByCurrency, baseCurrency);
+        Map<Currency, BigDecimal> convertedTotals = computeConvertedTotals(totalByCurrency);
+
+        return MonthlyEarningsResponse.builder()
+                .year(month.getYear())
+                .month(month.getMonthValue())
+                .totalSessionCount(totalSessions)
+                .sessionEarningsByCurrency(sessionByCurrency)
+                .totalPackageCount(packages.size())
+                .packageEarningsByCurrency(packageByCurrency)
+                .totalEarningsByCurrency(totalByCurrency)
+                .totalInBaseCurrency(totalInBase)
+                .baseCurrency(baseCurrency)
+                .convertedTotals(convertedTotals)
+                .dailyBreakdown(dailyList)
+                .build();
+    }
+
+    // ── helpers ─────────────────────────────────────────────────────────────
+
+    private DailyEarningsResponse buildDailyResponse(LocalDate date,
+                                                      List<ClassSession> sessions,
+                                                      Currency baseCurrency) {
+        // Sum prices grouped by their original currency
+        Map<Currency, BigDecimal> byCurrency = new EnumMap<>(Currency.class);
+        for (var session : sessions) {
+            Currency cur = session.getCurrency();
+            BigDecimal price = session.getPriceCharged();
+            if (cur != null && price != null) {
+                byCurrency.merge(cur, price, BigDecimal::add);
+            }
+        }
+
+        BigDecimal totalInBase = computeTotalInBaseCurrency(byCurrency, baseCurrency);
+        Map<Currency, BigDecimal> convertedTotals = computeConvertedTotals(byCurrency);
+
+        return DailyEarningsResponse.builder()
+                .date(date)
+                .sessionCount(sessions.size())
+                .earningsByCurrency(byCurrency)
+                .totalInBaseCurrency(totalInBase)
+                .baseCurrency(baseCurrency)
+                .convertedTotals(convertedTotals)
+                .build();
+    }
+
+    /**
+     * Converts each per-currency subtotal into the baseCurrency and sums them.
+     * Returns null if baseCurrency is not provided.
+     */
+    private BigDecimal computeTotalInBaseCurrency(Map<Currency, BigDecimal> byCurrency,
+                                                   Currency baseCurrency) {
+        if (baseCurrency == null || byCurrency.isEmpty()) {
+            return null;
+        }
+
+        BigDecimal total = BigDecimal.ZERO;
+        for (var entry : byCurrency.entrySet()) {
+            if (entry.getKey() == baseCurrency) {
+                total = total.add(entry.getValue());
+            } else {
+                Map<Currency, BigDecimal> converted =
+                        currencyConversionService.convertToAll(entry.getValue(), entry.getKey());
+                BigDecimal inBase = converted.getOrDefault(baseCurrency, BigDecimal.ZERO);
+                total = total.add(inBase);
+            }
+        }
+        return total.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Computes the grand total expressed in every supported currency.
+     * For each target currency, converts all per-currency subtotals and sums them.
+     */
+    private Map<Currency, BigDecimal> computeConvertedTotals(Map<Currency, BigDecimal> byCurrency) {
+        if (byCurrency.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Map<Currency, BigDecimal> result = new EnumMap<>(Currency.class);
+        for (Currency target : Currency.values()) {
+            BigDecimal sum = BigDecimal.ZERO;
+            for (var entry : byCurrency.entrySet()) {
+                if (entry.getKey() == target) {
+                    sum = sum.add(entry.getValue());
+                } else {
+                    Map<Currency, BigDecimal> converted =
+                            currencyConversionService.convertToAll(entry.getValue(), entry.getKey());
+                    sum = sum.add(converted.getOrDefault(target, BigDecimal.ZERO));
+                }
+            }
+            result.put(target, sum.setScale(2, RoundingMode.HALF_UP));
+        }
+        return Collections.unmodifiableMap(result);
+    }
+}
+

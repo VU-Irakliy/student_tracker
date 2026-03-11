@@ -60,4 +60,22 @@ public interface ClassSessionRepository extends JpaRepository<ClassSession, Long
 
     /** All non-deleted sessions linked to a specific package purchase. */
     List<ClassSession> findByPackagePurchaseIdAndDeletedFalse(Long packagePurchaseId);
+
+    /**
+     * Finds all PAID (per-class) sessions within a date range, excluding PACKAGE payments.
+     * Used for earnings aggregation.
+     */
+    @Query("""
+            SELECT cs FROM ClassSession cs
+            JOIN FETCH cs.student s
+            WHERE cs.deleted        = false
+              AND s.deleted         = false
+              AND cs.paymentStatus  = 'PAID'
+              AND cs.classDate     >= :from
+              AND cs.classDate     <= :to
+            ORDER BY cs.classDate, cs.startTime
+            """)
+    List<ClassSession> findPaidSessionsByDateRange(
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
 }

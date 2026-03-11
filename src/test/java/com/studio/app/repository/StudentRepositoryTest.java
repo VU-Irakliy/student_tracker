@@ -1,6 +1,7 @@
 package com.studio.app.repository;
 
 import com.studio.app.entity.Student;
+import com.studio.app.enums.Currency;
 import com.studio.app.enums.PricingType;
 import com.studio.app.enums.StudioTimezone;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,21 +34,21 @@ class StudentRepositoryTest {
         activeStudent = em.persistAndFlush(Student.builder()
                 .firstName("Ana")
                 .lastName("Garcia")
-                .email("ana@test.com")
                 .pricingType(PricingType.PER_CLASS)
                 .pricePerClass(new BigDecimal("35.00"))
+                .currency(Currency.EUROS)
                 .timezone(StudioTimezone.SPAIN)
                 .build());
 
         deletedStudent = Student.builder()
                 .firstName("Deleted")
                 .lastName("User")
-                .email("deleted@test.com")
                 .pricingType(PricingType.PER_CLASS)
                 .pricePerClass(new BigDecimal("25.00"))
+                .currency(Currency.DOLLARS)
                 .timezone(StudioTimezone.SPAIN)
-                .deleted(true)
                 .build();
+        deletedStudent.setDeleted(true);
         em.persistAndFlush(deletedStudent);
     }
 
@@ -63,7 +64,7 @@ class StudentRepositoryTest {
     void findByIdAndDeletedFalse_returnsActiveStudent() {
         assertThat(studentRepository.findByIdAndDeletedFalse(activeStudent.getId()))
                 .isPresent()
-                .hasValueSatisfying(s -> assertThat(s.getEmail()).isEqualTo("ana@test.com"));
+                .hasValueSatisfying(s -> assertThat(s.getFirstName()).isEqualTo("Ana"));
     }
 
     @Test
@@ -73,18 +74,9 @@ class StudentRepositoryTest {
     }
 
     @Test
-    void existsByEmailAndDeletedFalse_trueForActiveStudent() {
-        assertThat(studentRepository.existsByEmailAndDeletedFalse("ana@test.com")).isTrue();
-    }
-
-    @Test
-    void existsByEmailAndDeletedFalse_falseForDeletedStudent() {
-        assertThat(studentRepository.existsByEmailAndDeletedFalse("deleted@test.com")).isFalse();
-    }
-
-    @Test
-    void existsByEmailAndDeletedFalse_falseForUnknownEmail() {
-        assertThat(studentRepository.existsByEmailAndDeletedFalse("unknown@test.com")).isFalse();
+    void findByIdAndDeletedFalse_returnsEmptyForNonExistentId() {
+        assertThat(studentRepository.findByIdAndDeletedFalse(9999L))
+                .isEmpty();
     }
 
     @Test
@@ -114,6 +106,38 @@ class StudentRepositoryTest {
         List<Student> result = studentRepository.searchByName("xyz");
 
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    void searchByName_partialMatch() {
+        List<Student> result = studentRepository.searchByName("Gar");
+
+        assertThat(result).hasSize(1);
+    }
+
+    @Test
+    void findAllByDeletedFalse_returnsMultipleActiveStudents() {
+        em.persistAndFlush(Student.builder()
+                .firstName("Ivan").lastName("Petrov")
+                .pricingType(PricingType.PACKAGE)
+                .currency(Currency.RUBLES)
+                .timezone(StudioTimezone.RUSSIA_MOSCOW)
+                .build());
+
+        List<Student> result = studentRepository.findAllByDeletedFalse();
+        assertThat(result).hasSize(2);
+    }
+
+    @Test
+    void activeStudent_hasCurrencySet() {
+        var student = studentRepository.findByIdAndDeletedFalse(activeStudent.getId()).orElseThrow();
+        assertThat(student.getCurrency()).isEqualTo(Currency.EUROS);
+    }
+
+    @Test
+    void activeStudent_hasPricingTypeSet() {
+        var student = studentRepository.findByIdAndDeletedFalse(activeStudent.getId()).orElseThrow();
+        assertThat(student.getPricingType()).isEqualTo(PricingType.PER_CLASS);
     }
 }
 

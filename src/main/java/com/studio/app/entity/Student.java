@@ -1,5 +1,6 @@
 package com.studio.app.entity;
 
+import com.studio.app.enums.Currency;
 import com.studio.app.enums.PricingType;
 import com.studio.app.enums.StudioTimezone;
 import jakarta.persistence.*;
@@ -38,8 +39,6 @@ public class Student extends BaseEntity {
     @Column(name = "last_name", nullable = false)
     private String lastName;
 
-    @Column(name = "email", unique = true)
-    private String email;
 
     @Column(name = "phone_number")
     private String phoneNumber;
@@ -55,6 +54,11 @@ public class Student extends BaseEntity {
      */
     @Column(name = "price_per_class", precision = 10, scale = 2)
     private BigDecimal pricePerClass;
+
+    /** Currency used for this student's pricing. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "currency")
+    private Currency currency;
 
     /** Timezone used for displaying/scheduling this student's classes. */
     @Enumerated(EnumType.STRING)
@@ -84,4 +88,5 @@ public class Student extends BaseEntity {
     @OneToMany(mappedBy = "student", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<Payer> payers = new ArrayList<>();
+
 }

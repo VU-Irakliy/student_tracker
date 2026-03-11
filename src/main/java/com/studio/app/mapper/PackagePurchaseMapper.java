@@ -16,6 +16,7 @@ public interface PackagePurchaseMapper {
     @Mapping(target = "studentId",   source = "student.id")
     @Mapping(target = "studentName", expression = "java(pkg.getStudent().getFirstName() + \" \" + pkg.getStudent().getLastName())")
     @Mapping(target = "exhausted",   expression = "java(pkg.isExhausted())")
+    @Mapping(target = "convertedAmountPaid", ignore = true)
     PackagePurchaseResponse toResponse(PackagePurchase pkg);
 
     List<PackagePurchaseResponse> toResponseList(List<PackagePurchase> packages);

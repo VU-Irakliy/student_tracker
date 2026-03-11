@@ -1,5 +1,6 @@
 package com.studio.app.entity;
 
+import com.studio.app.enums.Currency;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -45,6 +46,11 @@ public class PackagePurchase extends BaseEntity {
     /** The actual amount received from the student (may differ from a list price). */
     @Column(name = "amount_paid", nullable = false, precision = 10, scale = 2)
     private BigDecimal amountPaid;
+
+    /** Currency in which the payment was made. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "currency")
+    private Currency currency;
 
     /** Date payment was received. */
     @Column(name = "payment_date", nullable = false)
