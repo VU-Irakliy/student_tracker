@@ -3,6 +3,10 @@
 A production-ready Spring Boot 3 / Java 21 REST API for managing students, recurring class schedules,
 one-off sessions, per-class and package-based payments, and a calendar view.
 
+> 📖 **Non-technical guide** (plain English, no coding knowledge needed): [HOW_IT_WORKS.md](./HOW_IT_WORKS.md)  
+> 📖 **Понятное руководство на русском языке**: [HOW_IT_WORKS_RU.md](./HOW_IT_WORKS_RU.md)  
+> 📖 **Technical business logic & edge cases**: [BUSINESS_LOGIC.md](./BUSINESS_LOGIC.md)
+
 ---
 
 ## Tech Stack
@@ -21,7 +25,7 @@ one-off sessions, per-class and package-based payments, and a calendar view.
 | AOP            | Spring AOP / AspectJ                |
 | Logging        | Logback (rolling error file)        |
 | API Docs       | SpringDoc OpenAPI (Swagger UI)      |
-| Testing        | JUnit 5, Mockito                    |
+| Testing        | JUnit 5, Mockito, H2 (in-memory)    |
 
 ---
 
@@ -31,10 +35,10 @@ one-off sessions, per-class and package-based payments, and a calendar view.
 src/main/java/com/studio/app/
 ├── StudentMgmtApplication.java          # Entry point
 ├── aspect/
-│   └── ErrorLoggingAspect.java          # AOP error logger (Desktop file)
+│   └── ErrorLoggingAspect.java          # AOP error logger (disabled in tests)
 ├── config/
 │   ├── DotenvPostProcessor.java         # Loads .env into Spring Environment
-│   └── WebMvcConfig.java                # CORS
+│   └── WebMvcConfig.java                # CORS configuration
 ├── controller/                          # API interfaces (annotations + Swagger)
 │   ├── StudentApi.java                  # /api/students
 │   ├── ScheduleApi.java                 # /api/students/{id}/schedules
@@ -44,6 +48,7 @@ src/main/java/com/studio/app/
 │   ├── SessionApi.java                  # /api/sessions/{id}
 │   ├── PackageApi.java                  # /api/packages/{id}
 │   ├── CalendarApi.java                 # /api/calendar
+│   ├── EarningsApi.java                 # /api/earnings
 │   └── impl/                            # Controller implementations
 │       ├── StudentController.java
 │       ├── ScheduleController.java
@@ -52,19 +57,22 @@ src/main/java/com/studio/app/
 │       ├── StudentPackageController.java
 │       ├── SessionController.java
 │       ├── PackageController.java
-│       └── CalendarController.java
+│       ├── CalendarController.java
+│       └── EarningsController.java
 ├── service/
-│   ├── StudentService.java              # interface
-│   ├── ScheduleService.java             # interface
-│   ├── ClassSessionService.java         # interface
-│   ├── PackageService.java              # interface
-│   ├── PayerService.java                # interface
-│   └── impl/                            # implementations
+│   ├── StudentService.java
+│   ├── ScheduleService.java
+│   ├── ClassSessionService.java
+│   ├── PackageService.java
+│   ├── PayerService.java
+│   ├── EarningsService.java
+│   ├── CurrencyConversionService.java
+│   └── impl/                            # Service implementations
 ├── repository/                          # JpaRepository interfaces
 ├── entity/
-│   ├── BaseEntity.java                  # audit + soft-delete
+│   ├── BaseEntity.java                  # audit timestamps + soft-delete flag
 │   ├── Student.java
-│   ├── WeeklySchedule.java              # recurring slots
+│   ├── WeeklySchedule.java              # recurring weekly slots
 │   ├── ClassSession.java                # concrete class instances
 │   ├── PackagePurchase.java             # package payment tracking
 │   └── Payer.java                       # bank-transfer payers
@@ -76,8 +84,9 @@ src/main/java/com/studio/app/
 │   ├── PricingType.java                 # PER_CLASS | PACKAGE
 │   ├── ClassStatus.java                 # SCHEDULED | COMPLETED | CANCELLED | MOVED
 │   ├── PaymentStatus.java               # UNPAID | PAID | PACKAGE | REFUNDED
+│   ├── Currency.java                    # EUROS | DOLLARS | RUBLES
 │   └── StudioTimezone.java              # SPAIN | RUSSIA_MOSCOW
-└── exception/                           # exceptions + global handler
+└── exception/                           # Custom exceptions + global handler
 
 src/main/resources/
 ├── application.properties               # app config
@@ -85,12 +94,13 @@ src/main/resources/
 
 db/
 ├── init/                                # auto-run on first Docker startup
-│   ├── 00_create_schema.sql             # CREATE SCHEMA studio
-│   ├── 01_create_tables.sql             # all tables (IF NOT EXISTS)
-│   └── 02_create_indexes.sql            # partial indexes
+│   ├── 00_create_schema.sql
+│   ├── 01_create_tables.sql
+│   ├── 02_create_indexes.sql
+│   └── 03–04_*.sql                      # additive migrations
 ├── scripts/
-│   ├── backup.ps1                       # dump studio schema to timestamped file
-│   └── restore.ps1                      # restore from a backup
+│   ├── backup.ps1
+│   └── restore.ps1
 └── backups/                             # dump output directory (git-ignored)
 ```
 
@@ -104,17 +114,15 @@ db/
 docker compose up -d
 ```
 
-This creates a local PostgreSQL 17 instance. On **first startup** (empty `pgdata/`) the
-SQL scripts in `db/init/` automatically create the `studio` schema, all tables, and indexes.
-
-Data is persisted in the project's `pgdata/` folder (git-ignored).
+On **first startup** (empty `pgdata/`) the SQL scripts in `db/init/` automatically create
+the `studio` schema, all tables, and indexes. Data is persisted in `pgdata/` (git-ignored).
 
 ```bash
-docker compose down          # stop (keeps data)
-docker compose down -v       # stop + remove volume
+docker compose down        # stop (keeps data)
+docker compose down -v     # stop + remove volume
 ```
 
-To reinitialise the database from scratch:
+To reinitialise from scratch:
 
 ```powershell
 docker compose down
@@ -124,8 +132,7 @@ docker compose up -d
 
 ### 2. Configure
 
-Environment variables are loaded from the `.env` file at the project root.
-Edit it or `application.properties` as needed:
+Edit the `.env` file at the project root:
 
 ```dotenv
 POSTGRES_HOST=127.0.0.1
@@ -149,8 +156,8 @@ Or from a JAR:
 java -jar target/student-mgmt-1.0.0.jar
 ```
 
-Server: `http://localhost:8080`
-Swagger UI: `http://localhost:8080/swagger-ui.html`
+- App: `http://localhost:8080`
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
 
 ---
 
@@ -158,28 +165,19 @@ Swagger UI: `http://localhost:8080/swagger-ui.html`
 
 ### Schema
 
-All application tables live in the dedicated **`studio`** PostgreSQL schema (not `public`).
-Hibernate is configured with `ddl-auto=validate` — it verifies the schema matches the
-entities on startup but never modifies it. The SQL init scripts are the single source of truth.
+All tables live in the dedicated **`studio`** PostgreSQL schema. Hibernate runs with
+`ddl-auto=validate` — it verifies entity/schema alignment on startup but never modifies it.
+The SQL init scripts are the single source of truth.
 
 ### Backup & Restore
 
-PowerShell scripts in `db/scripts/` use `docker exec` + `pg_dump`/`psql` to work with the
-running container.
-
-**Back up the database:**
-
 ```powershell
-.\db\scripts\backup.ps1                         # timestamped dump
-.\db\scripts\backup.ps1 -Tag "pre-migration"    # labelled dump
-```
+# Back up
+.\db\scripts\backup.ps1
+.\db\scripts\backup.ps1 -Tag "pre-migration"
 
-Output: `db/backups/studio_<timestamp>[_<tag>].sql`
-
-**Restore from a backup:**
-
-```powershell
-.\db\scripts\restore.ps1                         # latest backup
+# Restore
+.\db\scripts\restore.ps1
 .\db\scripts\restore.ps1 -File "db\backups\studio_20260311_140000.sql"
 ```
 
@@ -190,20 +188,32 @@ The restore runs inside a single transaction — if anything fails, nothing chan
 ## Error Logging
 
 An AOP aspect (`ErrorLoggingAspect`) intercepts every exception that escapes the controller
-layer and writes it to a rolling log file on the Desktop:
+layer and appends it to a rolling log file on the Desktop:
 
 ```
 ~/Desktop/studio-error-logs/error.log
 ```
 
-| Exception type                    | Log level | Detail            |
-|-----------------------------------|-----------|-------------------|
-| Business (404, 400, 409)          | `WARN`    | message only      |
-| Unexpected (NPE, DB errors, etc) | `ERROR`   | full stack trace  |
+| Exception type                   | Log level | Detail           |
+|----------------------------------|-----------|------------------|
+| Business (404, 400, 409)         | `WARN`    | message only     |
+| Unexpected (NPE, DB errors, etc) | `ERROR`   | full stack trace |
 
-The aspect and the file appender are **disabled during tests** (`@Profile("!test")`).
+Disabled automatically during tests (`@Profile("!test")`).
 
-Configuration: `src/main/resources/logback-spring.xml`
+---
+
+## Currency Conversion
+
+Student prices and session charges are stored in their **original currency**
+(`EUROS`, `DOLLARS`, or `RUBLES`). Every response that contains a monetary amount also
+includes a `convertedPrices` / `convertedAmountPaid` map showing the equivalent in all
+three currencies.
+
+Rates are fetched from the [Open Exchange Rate API](https://open.er-api.com) (no API key,
+~1 500 req/month free tier) and cached in-memory per base currency for 60 minutes
+(configurable via `currency.cache-ttl-minutes`). If the API is unreachable, the last known
+cached value is used as a fallback.
 
 ---
 
@@ -211,68 +221,59 @@ Configuration: `src/main/resources/logback-spring.xml`
 
 ### Students — `/api/students`
 
-| Method | Path                          | Description                        |
-|--------|-------------------------------|------------------------------------|
-| POST   | `/api/students`               | Create a student                   |
-| GET    | `/api/students`               | List all; `?search=name` to filter |
-| GET    | `/api/students/{id}`          | Get one student                    |
-| POST   | `/api/students/{id}`          | Update student (partial)           |
-| POST   | `/api/students/{id}/delete`   | Soft-delete student + all data     |
+| Method | Path                        | Description                        |
+|--------|-----------------------------|------------------------------------|
+| POST   | `/api/students`             | Create a student                   |
+| GET    | `/api/students`             | List all; `?search=name` to filter |
+| GET    | `/api/students/{id}`        | Get one student                    |
+| POST   | `/api/students/{id}`        | Update student (partial/patch)     |
+| POST   | `/api/students/{id}/delete` | Soft-delete student + all data     |
 
-**Create student body:**
+**Create / update body (all fields optional on update):**
 ```json
 {
   "firstName": "Ana",
   "lastName": "Garcia",
-  "email": "ana@studio.com",
   "phoneNumber": "+34 600 000 000",
   "pricingType": "PER_CLASS",
   "pricePerClass": 35.00,
+  "currency": "EUROS",
   "timezone": "SPAIN",
   "notes": "Prefers morning classes"
 }
 ```
-`pricingType`: `PER_CLASS` | `PACKAGE`
+`pricingType`: `PER_CLASS` | `PACKAGE`  
+`currency`: `EUROS` | `DOLLARS` | `RUBLES`  
 `timezone`: `SPAIN` | `RUSSIA_MOSCOW`
 
 ---
 
 ### Weekly Schedules — `/api/students/{studentId}/schedules`
 
-| Method | Path                                          | Description         |
-|--------|-----------------------------------------------|---------------------|
-| POST   | `/api/students/{id}/schedules`                | Add a recurring slot |
-| GET    | `/api/students/{id}/schedules`                | Get all active slots |
-| POST   | `/api/students/{id}/schedules/{sid}`          | Update a slot        |
-| POST   | `/api/students/{id}/schedules/{sid}/delete`   | Remove a slot        |
+| Method | Path                                        | Description          |
+|--------|---------------------------------------------|----------------------|
+| POST   | `/api/students/{id}/schedules`              | Add a recurring slot |
+| GET    | `/api/students/{id}/schedules`              | Get all active slots |
+| POST   | `/api/students/{id}/schedules/{sid}`        | Update a slot        |
+| POST   | `/api/students/{id}/schedules/{sid}/delete` | Remove a slot        |
 
-**Add schedule body:**
 ```json
-{
-  "dayOfWeek": "MONDAY",
-  "startTime": "10:00",
-  "durationMinutes": 60
-}
+{ "dayOfWeek": "MONDAY", "startTime": "10:00", "durationMinutes": 60 }
 ```
 
 ---
 
 ### Payers — `/api/students/{studentId}/payers`
 
-| Method | Path                                          | Description         |
-|--------|-----------------------------------------------|---------------------|
-| POST   | `/api/students/{id}/payers`                   | Add a payer          |
-| GET    | `/api/students/{id}/payers`                   | List payers          |
-| POST   | `/api/students/{id}/payers/{pid}`             | Update a payer       |
-| POST   | `/api/students/{id}/payers/{pid}/delete`      | Remove a payer       |
+| Method | Path                                      | Description    |
+|--------|-------------------------------------------|----------------|
+| POST   | `/api/students/{id}/payers`               | Add a payer    |
+| GET    | `/api/students/{id}/payers`               | List payers    |
+| POST   | `/api/students/{id}/payers/{pid}`         | Update a payer |
+| POST   | `/api/students/{id}/payers/{pid}/delete`  | Remove a payer |
 
-**Add payer body:**
 ```json
-{
-  "fullName": "Maria Garcia",
-  "phoneNumber": "+34 600 111 222",
-  "note": "Mother"
-}
+{ "fullName": "Maria Garcia", "phoneNumber": "+34 600 111 222", "note": "Mother" }
 ```
 
 ---
@@ -281,16 +282,15 @@ Configuration: `src/main/resources/logback-spring.xml`
 
 #### Create / List (student-scoped)
 
-| Method | Path                                             | Description                                       |
-|--------|--------------------------------------------------|---------------------------------------------------|
-| POST   | `/api/students/{id}/sessions`                    | Add a one-off (extra/moved) class                 |
-| GET    | `/api/students/{id}/sessions`                    | All sessions; `?from=&to=` date filter            |
-| GET    | `/api/students/{id}/sessions/by-payment`         | Filter by `?paymentStatus=PAID\|UNPAID\|PACKAGE`  |
+| Method | Path                                         | Description                                      |
+|--------|----------------------------------------------|--------------------------------------------------|
+| POST   | `/api/students/{id}/sessions`                | Add a one-off (extra/moved) class                |
+| GET    | `/api/students/{id}/sessions`                | All sessions; `?from=&to=` date filter           |
+| GET    | `/api/students/{id}/sessions/by-payment`     | Filter by `?paymentStatus=PAID\|UNPAID\|PACKAGE` |
 
-**One-off session body:**
 ```json
 {
-  "classDate": "2024-09-20",
+  "classDate": "2026-04-20",
   "startTime": "11:00",
   "durationMinutes": 60,
   "note": "Moved from Tuesday due to holiday"
@@ -299,20 +299,25 @@ Configuration: `src/main/resources/logback-spring.xml`
 
 #### Single session actions — `/api/sessions/{sessionId}`
 
-| Method | Path                                    | Description                                                        |
-|--------|-----------------------------------------|--------------------------------------------------------------------|
-| GET    | `/api/sessions/{id}`                    | Get session                                                        |
-| POST   | `/api/sessions/{id}/cancel`             | Cancel session                                                     |
-| POST   | `/api/sessions/{id}/pay`                | Mark session as paid (auto-deducts package for PACKAGE students)   |
-| POST   | `/api/sessions/{id}/cancel-payment`     | Revert payment (UNPAID / return to package)                        |
-| POST   | `/api/sessions/{id}/move-payment`       | Move payment to another session                                    |
+| Method | Path                                    | Description                                                      |
+|--------|-----------------------------------------|------------------------------------------------------------------|
+| GET    | `/api/sessions/{id}`                    | Get session details                                              |
+| POST   | `/api/sessions/{id}/cancel`             | Cancel session (optionally keep payment)                         |
+| POST   | `/api/sessions/{id}/pay`                | Mark as paid (auto-deducts from active package for PACKAGE type) |
+| POST   | `/api/sessions/{id}/cancel-payment`     | Revert payment (→ UNPAID or return slot to package)              |
+| POST   | `/api/sessions/{id}/move-payment`       | Move payment to another session                                  |
 
-**Cancel session body:**
+**Cancel:**
 ```json
-{ "keepAsPaid": true, "note": "Student cancelled last minute" }
+{ "keepAsPaid": false, "note": "Student cancelled last minute" }
 ```
 
-**Move payment body:**
+**Pay (PER_CLASS with optional price override):**
+```json
+{ "amountOverride": 30.00 }
+```
+
+**Move payment:**
 ```json
 { "targetSessionId": 42 }
 ```
@@ -321,24 +326,25 @@ Configuration: `src/main/resources/logback-spring.xml`
 
 ### Packages — `/api/students/{studentId}/packages`
 
-| Method | Path                                       | Description                  |
-|--------|--------------------------------------------|------------------------------|
-| POST   | `/api/students/{id}/packages`              | Record a package purchase    |
-| GET    | `/api/students/{id}/packages`              | All purchases (newest first) |
-| GET    | `/api/students/{id}/packages/active`       | Active packages (FIFO order) |
-| GET    | `/api/packages/{packageId}`                | Get one package              |
+| Method | Path                                  | Description                  |
+|--------|---------------------------------------|------------------------------|
+| POST   | `/api/students/{id}/packages`         | Record a package purchase    |
+| GET    | `/api/students/{id}/packages`         | All purchases (newest first) |
+| GET    | `/api/students/{id}/packages/active`  | Active packages (FIFO order) |
+| GET    | `/api/packages/{packageId}`           | Get one package              |
 
-**Purchase package body:**
 ```json
 {
   "totalClasses": 10,
   "amountPaid": 280.00,
-  "paymentDate": "2024-09-01",
-  "description": "Autumn 10-class bundle"
+  "currency": "EUROS",
+  "paymentDate": "2026-04-01",
+  "description": "Spring 10-class bundle"
 }
 ```
 
-> `amountPaid` is what the student actually paid — it can be any amount.
+> `amountPaid` is what the student actually paid — it can be any negotiated amount.  
+> `currency` defaults to the student's own currency if omitted.
 
 ---
 
@@ -348,45 +354,47 @@ Configuration: `src/main/resources/logback-spring.xml`
 |--------|-----------------|-------------------------------------------------------|
 | GET    | `/api/calendar` | All sessions grouped by day; `?from=&to=` date filter |
 
-Defaults to today through the next 30 days if dates are omitted.
+Defaults to today → next 30 days if dates are omitted.
 
-**Response structure:**
-```json
-[
-  {
-    "date": "2024-09-16",
-    "sessions": [
-      {
-        "id": 5,
-        "studentId": 1,
-        "studentName": "Ana Garcia",
-        "classDate": "2024-09-16",
-        "startTime": "10:00",
-        "durationMinutes": 60,
-        "status": "SCHEDULED",
-        "paymentStatus": "PAID",
-        "priceCharged": 35.00,
-        "packagePurchaseId": null,
-        "oneOff": false
-      }
-    ]
-  }
-]
-```
+---
+
+### Earnings — `/api/earnings`
+
+| Method | Path                 | Description                                    |
+|--------|----------------------|------------------------------------------------|
+| GET    | `/api/earnings/daily`   | Per-day earnings for a date range           |
+| GET    | `/api/earnings/monthly` | Monthly summary with optional base currency |
+
+Query parameters:
+- `from`, `to` — date range (`YYYY-MM-DD`)
+- `year`, `month` — for monthly endpoint
+- `baseCurrency` — `EUROS` | `DOLLARS` | `RUBLES` (optional; returns a normalised total)
+
+**Daily earnings** count only `PAID` (per-class) sessions.  
+**Monthly earnings** include both per-class session payments **and** package purchase payments
+(matched by `paymentDate` within the month).
 
 ---
 
 ## Business Rules Summary
 
-| Scenario                             | Behaviour                                                                                                    |
-|--------------------------------------|--------------------------------------------------------------------------------------------------------------|
-| Cancel + keep as paid                | `status=CANCELLED`, paymentStatus unchanged                                                                  |
-| Cancel + release payment (PER_CLASS) | `paymentStatus=UNPAID`; use move-payment to reassign                                                         |
-| Cancel + package                     | Package slot returned (`classesRemaining + 1`)                                                               |
-| Cancel payment for paid session      | Reverts to UNPAID (PER_CLASS) or returns slot (PACKAGE)                                                      |
-| Assign package to session            | Automatic: `/pay` detects PACKAGE pricing and deducts from oldest active package (FIFO)                      |
-| Student leaves (soft delete)         | Student + schedules + payers soft-deleted; only **future** sessions are deleted — past sessions are preserved |
-| Price capture                        | `priceCharged` copied from student at session creation time                                                  |
+| Scenario                                | Behaviour                                                                                  |
+|-----------------------------------------|--------------------------------------------------------------------------------------------|
+| Cancel + keep as paid                   | `status=CANCELLED`, payment status unchanged, package slot NOT returned                    |
+| Cancel + release payment (PER_CLASS)    | `paymentStatus=UNPAID`; use `/move-payment` to reassign to another session                 |
+| Cancel + release payment (PACKAGE)      | Package slot returned (`classesRemaining + 1`); session unlinked from package              |
+| Cancel already-cancelled session        | `400 Bad Request`                                                                          |
+| Cancel payment on UNPAID session        | `400 Bad Request`                                                                          |
+| Pay session (PACKAGE student)           | Auto-deducts from oldest active package (FIFO); `paymentStatus=PACKAGE`                   |
+| Pay session (no active package)         | `400 Bad Request`                                                                          |
+| Pay already-paid session                | `400 Bad Request`                                                                          |
+| Move payment (source must be PAID)      | Source → `UNPAID`, target → `PAID`, price transferred                                     |
+| Student soft-delete                     | Student + schedules + payers soft-deleted; only **future** sessions deleted, past kept     |
+| Price capture                           | `priceCharged` copied from student at session creation time                                |
+| Package FIFO deduction                  | Oldest active package (by `paymentDate`) is consumed first                                 |
+| Currency conversion unavailable         | Stale cache used if available; otherwise `convertedPrices` map is empty (no crash)         |
+
+> 📖 See [BUSINESS_LOGIC.md](./BUSINESS_LOGIC.md) for full scenario walkthroughs.
 
 ---
 
@@ -396,5 +404,7 @@ Defaults to today through the next 30 days if dates are omitted.
 mvn test
 ```
 
-Tests run with the `test` profile — the AOP error logging aspect and Desktop file
-appender are automatically disabled.
+Tests use the `test` Spring profile with an **H2 in-memory database**. The AOP error
+logging aspect and Desktop file appender are automatically disabled. A stub
+`CurrencyConversionService` with fixed rates is injected for all integration tests so no
+real HTTP calls are made.
