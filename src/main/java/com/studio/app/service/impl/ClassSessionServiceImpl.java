@@ -108,17 +108,31 @@ public class ClassSessionServiceImpl implements ClassSessionService {
     @Override
     public ClassSessionResponse markSessionPaid(Long sessionId, PaySessionRequest request) {
         var session = findActiveSession(sessionId);
+        var student = session.getStudent();
 
-        if (session.getPaymentStatus() == PaymentStatus.PAID) {
-            throw new BadRequestException("Session is already marked as paid");
-        }
-        if (session.getStudent().getPricingType() != PricingType.PER_CLASS) {
-            throw new BadRequestException("Use assignPackageToSession() for package students");
+        if (session.getPaymentStatus() == PaymentStatus.PAID
+                || session.getPaymentStatus() == PaymentStatus.PACKAGE) {
+            throw new BadRequestException("Session is already paid");
         }
 
-        // Use override amount if provided; otherwise keep the captured price
-        Optional.ofNullable(request.getAmountOverride()).ifPresent(session::setPriceCharged);
-        session.setPaymentStatus(PaymentStatus.PAID);
+        if (student.getPricingType() == PricingType.PACKAGE) {
+            // Auto-deduct from oldest active package (FIFO)
+            var pkg = packageRepository.findActivePackagesByStudent(student.getId())
+                    .stream()
+                    .findFirst()
+                    .orElseThrow(() -> new BadRequestException(
+                            "No active package with remaining classes found"));
+
+            pkg.setClassesRemaining(pkg.getClassesRemaining() - 1);
+            packageRepository.save(pkg);
+
+            session.setPackagePurchase(pkg);
+            session.setPaymentStatus(PaymentStatus.PACKAGE);
+        } else {
+            // PER_CLASS: use override amount if provided; otherwise keep the captured price
+            Optional.ofNullable(request.getAmountOverride()).ifPresent(session::setPriceCharged);
+            session.setPaymentStatus(PaymentStatus.PAID);
+        }
 
         return sessionMapper.toResponse(sessionRepository.save(session));
     }
@@ -177,32 +191,6 @@ public class ClassSessionServiceImpl implements ClassSessionService {
                 sessionRepository.findByStudentIdAndPaymentStatusAndDeletedFalse(studentId, paymentStatus));
     }
 
-    /** {@inheritDoc} */
-    @Override
-    public ClassSessionResponse assignPackageToSession(Long sessionId) {
-        var session = findActiveSession(sessionId);
-        var student = session.getStudent();
-
-        if (student.getPricingType() != PricingType.PACKAGE) {
-            throw new BadRequestException("Student is not on a package pricing model");
-        }
-        if (session.getPaymentStatus() == PaymentStatus.PACKAGE) {
-            throw new BadRequestException("Session is already covered by a package");
-        }
-
-        var pkg = packageRepository.findActivePackagesByStudent(student.getId())
-                .stream()
-                .findFirst()
-                .orElseThrow(() -> new BadRequestException("No active package with remaining classes found"));
-
-        pkg.setClassesRemaining(pkg.getClassesRemaining() - 1);
-        packageRepository.save(pkg);
-
-        session.setPackagePurchase(pkg);
-        session.setPaymentStatus(PaymentStatus.PACKAGE);
-
-        return sessionMapper.toResponse(sessionRepository.save(session));
-    }
 
     /** {@inheritDoc} */
     @Override

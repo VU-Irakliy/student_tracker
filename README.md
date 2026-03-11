@@ -162,10 +162,9 @@ Server: `http://localhost:8080`
 |--------|-----------------------------------------|----------------------------------------------------|
 | GET    | `/api/sessions/{id}`                    | Get session                                        |
 | POST   | `/api/sessions/{id}/cancel`             | Cancel session                                     |
-| POST   | `/api/sessions/{id}/pay`                | Mark PER_CLASS session as paid                     |
+| POST   | `/api/sessions/{id}/pay`                | Mark session as paid (auto-deducts package for PACKAGE students) |
 | POST   | `/api/sessions/{id}/cancel-payment`     | Revert payment (UNPAID / return to package)        |
 | POST   | `/api/sessions/{id}/move-payment`       | Move payment to another session                    |
-| POST   | `/api/sessions/{id}/assign-package`     | Deduct from active package (PACKAGE students)      |
 
 **Cancel session body:**
 ```json
@@ -242,7 +241,7 @@ Server: `http://localhost:8080`
 | Cancel + release payment (PER_CLASS) | `paymentStatus=UNPAID`; use move-payment to reassign              |
 | Cancel + package                  | Package slot returned (`classesRemaining + 1`)                        |
 | Cancel payment for paid session   | Reverts to UNPAID (PER_CLASS) or returns slot (PACKAGE)              |
-| Assign package to session         | Oldest active package consumed first (FIFO); `classesRemaining - 1`  |
+| Assign package to session         | Automatic: `/pay` detects PACKAGE pricing and deducts from oldest active package (FIFO) |
 | Student leaves (soft delete)      | Student + all schedules + all sessions soft-deleted                   |
 | Price capture                     | `priceCharged` copied from student at session creation time           |
 

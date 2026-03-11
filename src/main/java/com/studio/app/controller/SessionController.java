@@ -48,11 +48,14 @@ public class SessionController {
     }
 
     /**
-     * Marks a {@code PER_CLASS} session as paid.
-     * Body is optional — omit to use the captured price.
+     * Marks a session as paid.
+     * <ul>
+     *   <li>{@code PER_CLASS} students: marks as {@code PAID}. Body is optional — omit to use the captured price.</li>
+     *   <li>{@code PACKAGE} students: auto-deducts from the oldest active package (FIFO). Body is ignored.</li>
+     * </ul>
      *
      * @param sessionId the session ID
-     * @param request   optional amount override
+     * @param request   optional amount override (PER_CLASS only)
      * @return 200 OK with updated session
      */
     @PostMapping("/{sessionId}/pay")
@@ -86,17 +89,5 @@ public class SessionController {
             @PathVariable Long sessionId,
             @Valid @RequestBody MovePaymentRequest request) {
         return ResponseEntity.ok(sessionService.movePayment(sessionId, request));
-    }
-
-    /**
-     * Assigns a class from the student's active package to this session.
-     * Uses the oldest active package first (FIFO).
-     *
-     * @param sessionId the session ID
-     * @return 200 OK with updated session
-     */
-    @PostMapping("/{sessionId}/assign-package")
-    public ResponseEntity<ClassSessionResponse> assignPackage(@PathVariable Long sessionId) {
-        return ResponseEntity.ok(sessionService.assignPackageToSession(sessionId));
     }
 }

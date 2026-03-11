@@ -53,10 +53,14 @@ public interface ClassSessionService {
     ClassSessionResponse cancelSession(Long sessionId, CancelSessionRequest request);
 
     /**
-     * Marks a {@code PER_CLASS} session as paid.
+     * Marks a session as paid.
+     * <ul>
+     *   <li>{@code PER_CLASS} students: marks as {@code PAID}, with optional amount override.</li>
+     *   <li>{@code PACKAGE} students: auto-deducts from the oldest active package (FIFO).</li>
+     * </ul>
      *
      * @param sessionId the session ID
-     * @param request   optional amount override
+     * @param request   optional amount override (PER_CLASS only)
      * @return the updated session
      */
     ClassSessionResponse markSessionPaid(Long sessionId, PaySessionRequest request);
@@ -88,14 +92,6 @@ public interface ClassSessionService {
      */
     List<ClassSessionResponse> getSessionsByPaymentStatus(Long studentId, PaymentStatus paymentStatus);
 
-    /**
-     * Deducts a class from the student's active package and marks the session
-     * as covered by that package.
-     *
-     * @param sessionId the session ID
-     * @return the updated session
-     */
-    ClassSessionResponse assignPackageToSession(Long sessionId);
 
     /**
      * Returns a calendar view grouped by day for the given date range.
