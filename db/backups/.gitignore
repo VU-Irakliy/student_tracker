@@ -1,0 +1,4 @@
+# Backup dumps contain real data — never commit them.
+*.sql
+!.gitignore
+
