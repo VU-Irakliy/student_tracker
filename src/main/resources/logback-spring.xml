@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Logback configuration for Studio Student Management.
+
+  Console  : always active, INFO+
+  Error file : active in non-test profiles only,
+               writes to ~/Desktop/studio-error-logs/
+-->
+<configuration>
+
+    <!-- ── Spring Boot defaults + console ────────────────────── -->
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <!-- ── Error file appender (non-test only) ───────────────── -->
+    <springProfile name="!test">
+
+        <property name="ERROR_LOG_DIR"
+                  value="${user.home}/Desktop/studio-error-logs"/>
+
+        <appender name="ERROR_FILE"
+                  class="ch.qos.logback.core.rolling.RollingFileAppender">
+
+            <!-- Current log file -->
+            <file>${ERROR_LOG_DIR}/error.log</file>
+
+            <!-- Only ERROR and above -->
+            <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+                <level>ERROR</level>
+            </filter>
+
+            <!-- Roll daily, keep 30 days, cap at 50 MB total -->
+            <rollingPolicy
+                    class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+                <fileNamePattern>
+                    ${ERROR_LOG_DIR}/error.%d{yyyy-MM-dd}.%i.log
+                </fileNamePattern>
+                <maxFileSize>10MB</maxFileSize>
+                <maxHistory>30</maxHistory>
+                <totalSizeCap>50MB</totalSizeCap>
+            </rollingPolicy>
+
+            <encoder>
+                <pattern>
+                    %d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{40} - %msg%n%xException
+                </pattern>
+            </encoder>
+        </appender>
+
+        <!-- Aspect logger → console + error file -->
+        <logger name="com.studio.app.aspect.ErrorLoggingAspect"
+                level="ERROR" additivity="false">
+            <appender-ref ref="ERROR_FILE"/>
+            <appender-ref ref="CONSOLE"/>
+        </logger>
+
+    </springProfile>
+
+    <!-- ── Root logger ───────────────────────────────────────── -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+</configuration>
+

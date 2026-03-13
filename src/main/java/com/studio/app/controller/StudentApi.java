@@ -1,0 +1,74 @@
+package com.studio.app.controller;
+
+import com.studio.app.constant.ApiConstants;
+import com.studio.app.dto.request.CreateStudentRequest;
+import com.studio.app.dto.request.UpdateStudentRequest;
+import com.studio.app.dto.response.StudentResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+/**
+ * REST API contract for student CRUD operations.
+ * Provides endpoints to create, list, retrieve, update, and soft-delete students.
+ */
+@Tag(name = "Students", description = "CRUD operations for managing students")
+@RequestMapping(ApiConstants.STUDENTS)
+public interface StudentApi {
+
+    /**
+     * Registers a new student with pricing type, price, and timezone.
+     *
+     * @param request the student creation details
+     * @return the created {@link StudentResponse}
+     */
+    @Operation(summary = "Create a student", description = "Registers a new student with pricing type, price, and timezone.")
+    @PostMapping
+    ResponseEntity<StudentResponse> createStudent(@Valid @RequestBody CreateStudentRequest request);
+
+    /**
+     * Returns all active students, optionally filtered by a search term.
+     *
+     * @param search an optional name filter; if {@code null} or blank, all students are returned
+     * @return a list of {@link StudentResponse} objects
+     */
+    @Operation(summary = "List all students", description = "Returns all active students. Pass an optional 'search' param to filter by name.")
+    @GetMapping
+    ResponseEntity<List<StudentResponse>> getAllStudents(@RequestParam(required = false) String search);
+
+    /**
+     * Returns a single student by their ID.
+     *
+     * @param id the ID of the student
+     * @return the {@link StudentResponse} for the requested student
+     */
+    @Operation(summary = "Get a student by ID", description = "Returns a single student by their ID.")
+    @GetMapping("/{id}")
+    ResponseEntity<StudentResponse> getStudentById(@PathVariable Long id);
+
+    /**
+     * Partially updates a student. Only non-null fields in the request are applied.
+     *
+     * @param id      the ID of the student to update
+     * @param request the fields to update
+     * @return the updated {@link StudentResponse}
+     */
+    @Operation(summary = "Update a student", description = "Partially updates a student. Only non-null fields are applied.")
+    @PutMapping("/{id}")
+    ResponseEntity<StudentResponse> updateStudent(@PathVariable Long id, @Valid @RequestBody UpdateStudentRequest request);
+
+    /**
+     * Soft-deletes a student together with their schedules, payers, and future sessions.
+     * Past sessions are preserved.
+     *
+     * @param id the ID of the student to delete
+     * @return 204 No Content on success
+     */
+    @Operation(summary = "Delete a student", description = "Soft-deletes a student, their schedules, payers, and future sessions. Past sessions are preserved.")
+    @DeleteMapping("/{id}")
+    ResponseEntity<Void> deleteStudent(@PathVariable Long id);
+}
