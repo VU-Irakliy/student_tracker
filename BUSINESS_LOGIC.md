@@ -19,7 +19,8 @@ situation.
 9. [Student Deletion](#9-student-deletion)
 10. [Debtor Status Batch](#10-debtor-status-batch)
 11. [Currency Conversion](#11-currency-conversion)
-12. [Error Reference](#12-error-reference)
+12. [Data Export/Import](#12-data-exportimport)
+13. [Error Reference](#13-error-reference)
 
 ---
 
@@ -498,7 +499,29 @@ is always present.
 
 ---
 
-## 12. Error Reference
+## 12. Data Export/Import
+
+### Export (`GET /api/data/export`)
+
+- Returns one JSON snapshot with all core tables:
+  - students
+  - weekly schedules
+  - package purchases
+  - class sessions
+  - payers
+- Includes active and soft-deleted rows.
+- Uses deterministic ordering by ID for stable snapshots.
+
+### Import (`POST /api/data/import`)
+
+- Replaces current data with the supplied snapshot.
+- Executes in one transaction (all-or-nothing).
+- Validates references while importing (e.g., session -> student/package/schedule links).
+- Intended for migration to a fresh deployment/database.
+
+---
+
+## 13. Error Reference
 
 | HTTP Status | When it occurs                                                              |
 |-------------|-----------------------------------------------------------------------------|

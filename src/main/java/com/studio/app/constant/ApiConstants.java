@@ -19,5 +19,6 @@ public final class ApiConstants {
     public static final String PACKAGES  = "/api/packages";
     public static final String CALENDAR  = "/api/calendar";
     public static final String EARNINGS  = "/api/earnings";
+    public static final String DATA      = "/api/data";
 }
 

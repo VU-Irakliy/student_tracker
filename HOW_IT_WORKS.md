@@ -33,6 +33,7 @@ track of:
 - Which classes have happened
 - Whether those classes have been paid for
 - How much money you've earned
+- How to move all your data to a fresh app instance (export/import)
 
 Think of it like a **digital notebook** — but one that understands the difference between
 "Ana paid for this class" and "Ivan's class came out of his prepaid package."
@@ -402,4 +403,8 @@ show — but all the original values are still there.
 **"The price shown in other currencies looks wrong."**
 > The conversion rates update every hour. If the internet was down, the rates might be
 > slightly out of date — but they'll refresh automatically next time connectivity is restored.
+
+**"I installed a new app version and my new DB is empty. Can I transfer everything?"**
+> Yes. Export a snapshot from the old app (`GET /api/data/export`) and import it into the new
+> app (`POST /api/data/import`). The import replaces current data with the snapshot.
 

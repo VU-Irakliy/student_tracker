@@ -49,6 +49,7 @@ src/main/java/com/studio/app/
 │   ├── PackageApi.java                  # /api/packages/{id}
 │   ├── CalendarApi.java                 # /api/calendar
 │   ├── EarningsApi.java                 # /api/earnings
+│   ├── DataPortabilityApi.java          # /api/data
 │   └── impl/                            # Controller implementations
 │       ├── StudentController.java
 │       ├── ScheduleController.java
@@ -58,7 +59,8 @@ src/main/java/com/studio/app/
 │       ├── SessionController.java
 │       ├── PackageController.java
 │       ├── CalendarController.java
-│       └── EarningsController.java
+│       ├── EarningsController.java
+│       └── DataPortabilityController.java
 ├── service/
 │   ├── StudentService.java
 │   ├── ScheduleService.java
@@ -66,6 +68,7 @@ src/main/java/com/studio/app/
 │   ├── PackageService.java
 │   ├── PayerService.java
 │   ├── EarningsService.java
+│   ├── DataPortabilityService.java
 │   ├── CurrencyConversionService.java
 │   └── impl/                            # Service implementations
 ├── repository/                          # JpaRepository interfaces
@@ -431,6 +434,29 @@ To get **weekly earnings**, call `/api/earnings/daily` with any 7-day range.
 
 **Monthly earnings** include both per-class session payments **and** package purchase payments
 (matched by `paymentDate` within the month).
+
+---
+
+### Data Portability — `/api/data`
+
+| Method | Path                | Description                                               |
+|--------|---------------------|-----------------------------------------------------------|
+| GET    | `/api/data/export`      | Download full data snapshot file (compressed JSON GZIP) |
+| POST   | `/api/data/import`      | Replace current data with `.json.gz` bytes or plain JSON |
+| POST   | `/api/data/import-file` | Replace current data using uploaded snapshot file      |
+
+Use this when deploying a new app version into a fresh database and you need to move data from the old instance.
+
+Recommended flow:
+1. Call `GET /api/data/export` on the old environment and save the `.json.gz` file.
+2. Start the new environment with an empty DB.
+3. Import using one of:
+   - `POST /api/data/import` with the downloaded file content directly
+   - `POST /api/data/import-file` with multipart file upload
+
+Exported file name format:
+- `student-mgmt-export-YYYYMMDD_HHMMSS-utc.json.gz`
+- Example: `student-mgmt-export-20260315_184530-utc.json.gz`
 
 ---
 
