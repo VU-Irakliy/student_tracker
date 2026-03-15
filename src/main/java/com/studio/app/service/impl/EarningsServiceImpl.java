@@ -2,7 +2,9 @@ package com.studio.app.service.impl;
 
 import com.studio.app.dto.response.DailyEarningsResponse;
 import com.studio.app.dto.response.MonthlyEarningsResponse;
+import com.studio.app.dto.response.PeriodEarningsResponse;
 import com.studio.app.entity.ClassSession;
+import com.studio.app.entity.PackagePurchase;
 import com.studio.app.enums.Currency;
 import com.studio.app.repository.ClassSessionRepository;
 import com.studio.app.repository.PackagePurchaseRepository;
@@ -22,8 +24,12 @@ import java.util.stream.Collectors;
 /**
  * Default implementation of {@link EarningsService}.
  *
- * <p><b>Daily earnings</b> aggregate only sessions with {@code paymentStatus == PAID}
- * (i.e. per-class payments). Package-covered sessions are excluded.
+ * <p><b>Selected-period daily earnings</b> aggregate sessions with
+ * {@code paymentStatus == PAID} (i.e. per-class payments), and also provide
+ * period totals for earned amounts, plus potential amounts both excluding
+ * cancellations and including cancellations.
+ * Package purchases are included in those period totals when
+ * {@code paymentDate} falls inside the selected date range.
  *
  * <p><b>Monthly earnings</b> include both per-class session payments <em>and</em>
  * package purchase payments (matched by {@code paymentDate} within the month).
@@ -45,16 +51,79 @@ public class EarningsServiceImpl implements EarningsService {
 
     /** {@inheritDoc} */
     @Override
-    public List<DailyEarningsResponse> getDailyEarnings(LocalDate from, LocalDate to, Currency baseCurrency) {
+    public PeriodEarningsResponse getDailyEarnings(LocalDate from, LocalDate to, Currency baseCurrency) {
         var sessions = sessionRepository.findPaidSessionsByDateRange(from, to);
 
         // Group sessions by date
         Map<LocalDate, List<ClassSession>> byDate = sessions.stream()
                 .collect(Collectors.groupingBy(ClassSession::getClassDate, TreeMap::new, Collectors.toList()));
 
-        return byDate.entrySet().stream()
+        List<DailyEarningsResponse> dailyList = byDate.entrySet().stream()
                 .map(entry -> buildDailyResponse(entry.getKey(), entry.getValue(), baseCurrency))
                 .toList();
+
+        Map<Currency, BigDecimal> sessionEarnedByCurrency = aggregateByCurrency(
+                sessions,
+                ClassSession::getCurrency,
+                ClassSession::getPriceCharged
+        );
+
+        var periodPackages = packageRepository.findByPaymentDateRange(from, to);
+        Map<Currency, BigDecimal> packagePaidByCurrency = aggregateByCurrency(
+                periodPackages,
+                PackagePurchase::getCurrency,
+                PackagePurchase::getAmountPaid
+        );
+
+        Map<Currency, BigDecimal> totalEarnedByCurrency = mergeByCurrency(
+                sessionEarnedByCurrency,
+                packagePaidByCurrency
+        );
+
+        var potentialExcludingCancelledSessions = sessionRepository.findCollectiblePerClassSessionsByDateRange(from, to);
+        Map<Currency, BigDecimal> potentialExcludingCancelledPerClassByCurrency = aggregateByCurrency(
+                potentialExcludingCancelledSessions,
+                ClassSession::getCurrency,
+                ClassSession::getPriceCharged
+        );
+
+        Map<Currency, BigDecimal> totalCouldHaveEarnedExcludingCancellationsByCurrency = mergeByCurrency(
+                potentialExcludingCancelledPerClassByCurrency,
+                packagePaidByCurrency
+        );
+
+        var potentialIncludingCancelledSessions =
+                sessionRepository.findPotentialPerClassSessionsIncludingCancellationsByDateRange(from, to);
+        Map<Currency, BigDecimal> potentialIncludingCancelledPerClassByCurrency = aggregateByCurrency(
+                potentialIncludingCancelledSessions,
+                ClassSession::getCurrency,
+                ClassSession::getPriceCharged
+        );
+
+        Map<Currency, BigDecimal> totalCouldHaveEarnedIncludingCancellationsByCurrency = mergeByCurrency(
+                potentialIncludingCancelledPerClassByCurrency,
+                packagePaidByCurrency
+        );
+
+        return PeriodEarningsResponse.builder()
+                .from(from)
+                .to(to)
+                .dailyBreakdown(dailyList)
+                .totalEarnedByCurrency(totalEarnedByCurrency)
+                .totalEarnedInBaseCurrency(computeTotalInBaseCurrency(totalEarnedByCurrency, baseCurrency))
+                .totalCouldHaveEarnedExcludingCancellationsByCurrency(totalCouldHaveEarnedExcludingCancellationsByCurrency)
+                .totalCouldHaveEarnedExcludingCancellationsInBaseCurrency(
+                        computeTotalInBaseCurrency(totalCouldHaveEarnedExcludingCancellationsByCurrency, baseCurrency))
+                .totalCouldHaveEarnedIncludingCancellationsByCurrency(totalCouldHaveEarnedIncludingCancellationsByCurrency)
+                .totalCouldHaveEarnedIncludingCancellationsInBaseCurrency(
+                        computeTotalInBaseCurrency(totalCouldHaveEarnedIncludingCancellationsByCurrency, baseCurrency))
+                .baseCurrency(baseCurrency)
+                .convertedTotalEarned(computeConvertedTotals(totalEarnedByCurrency))
+                .convertedTotalCouldHaveEarnedExcludingCancellations(
+                        computeConvertedTotals(totalCouldHaveEarnedExcludingCancellationsByCurrency))
+                .convertedTotalCouldHaveEarnedIncludingCancellations(
+                        computeConvertedTotals(totalCouldHaveEarnedIncludingCancellationsByCurrency))
+                .build();
     }
 
     /** {@inheritDoc} */
@@ -64,7 +133,8 @@ public class EarningsServiceImpl implements EarningsService {
         LocalDate to = month.atEndOfMonth();
 
         // ── Per-class session earnings ──────────────────────────────────
-        var dailyList = getDailyEarnings(from, to, baseCurrency);
+        var dailyPeriod = getDailyEarnings(from, to, baseCurrency);
+        var dailyList = dailyPeriod.getDailyBreakdown();
 
         Map<Currency, BigDecimal> sessionByCurrency = new EnumMap<>(Currency.class);
         int totalSessions = 0;
@@ -112,18 +182,37 @@ public class EarningsServiceImpl implements EarningsService {
 
     // ── helpers ─────────────────────────────────────────────────────────────
 
+    private <T> Map<Currency, BigDecimal> aggregateByCurrency(List<T> items,
+                                                              java.util.function.Function<T, Currency> currencyExtractor,
+                                                              java.util.function.Function<T, BigDecimal> amountExtractor) {
+        Map<Currency, BigDecimal> byCurrency = new EnumMap<>(Currency.class);
+        for (var item : items) {
+            Currency cur = currencyExtractor.apply(item);
+            BigDecimal amount = amountExtractor.apply(item);
+            if (cur != null && amount != null) {
+                byCurrency.merge(cur, amount, BigDecimal::add);
+            }
+        }
+        return byCurrency;
+    }
+
+    private Map<Currency, BigDecimal> mergeByCurrency(Map<Currency, BigDecimal> left,
+                                                      Map<Currency, BigDecimal> right) {
+        Map<Currency, BigDecimal> merged = new EnumMap<>(Currency.class);
+        left.forEach((cur, amt) -> merged.merge(cur, amt, BigDecimal::add));
+        right.forEach((cur, amt) -> merged.merge(cur, amt, BigDecimal::add));
+        return merged;
+    }
+
     private DailyEarningsResponse buildDailyResponse(LocalDate date,
                                                       List<ClassSession> sessions,
                                                       Currency baseCurrency) {
         // Sum prices grouped by their original currency
-        Map<Currency, BigDecimal> byCurrency = new EnumMap<>(Currency.class);
-        for (var session : sessions) {
-            Currency cur = session.getCurrency();
-            BigDecimal price = session.getPriceCharged();
-            if (cur != null && price != null) {
-                byCurrency.merge(cur, price, BigDecimal::add);
-            }
-        }
+        Map<Currency, BigDecimal> byCurrency = aggregateByCurrency(
+                sessions,
+                ClassSession::getCurrency,
+                ClassSession::getPriceCharged
+        );
 
         BigDecimal totalInBase = computeTotalInBaseCurrency(byCurrency, baseCurrency);
         Map<Currency, BigDecimal> convertedTotals = computeConvertedTotals(byCurrency);

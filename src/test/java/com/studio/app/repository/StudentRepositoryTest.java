@@ -3,6 +3,7 @@ package com.studio.app.repository;
 import com.studio.app.entity.Student;
 import com.studio.app.enums.Currency;
 import com.studio.app.enums.PricingType;
+import com.studio.app.enums.StudentClassType;
 import com.studio.app.enums.StudioTimezone;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,6 +39,7 @@ class StudentRepositoryTest {
                 .pricePerClass(new BigDecimal("35.00"))
                 .currency(Currency.EUROS)
                 .timezone(StudioTimezone.SPAIN)
+                .classType(StudentClassType.EGE)
                 .build());
 
         deletedStudent = Student.builder()
@@ -47,6 +49,7 @@ class StudentRepositoryTest {
                 .pricePerClass(new BigDecimal("25.00"))
                 .currency(Currency.DOLLARS)
                 .timezone(StudioTimezone.SPAIN)
+                .classType(StudentClassType.CASUAL)
                 .build();
         deletedStudent.setDeleted(true);
         em.persistAndFlush(deletedStudent);
@@ -122,6 +125,7 @@ class StudentRepositoryTest {
                 .pricingType(PricingType.PACKAGE)
                 .currency(Currency.RUBLES)
                 .timezone(StudioTimezone.RUSSIA_MOSCOW)
+                .classType(StudentClassType.OGE)
                 .build());
 
         List<Student> result = studentRepository.findAllByDeletedFalse();
@@ -138,6 +142,12 @@ class StudentRepositoryTest {
     void activeStudent_hasPricingTypeSet() {
         var student = studentRepository.findByIdAndDeletedFalse(activeStudent.getId()).orElseThrow();
         assertThat(student.getPricingType()).isEqualTo(PricingType.PER_CLASS);
+    }
+
+    @Test
+    void activeStudent_hasClassTypeSet() {
+        var student = studentRepository.findByIdAndDeletedFalse(activeStudent.getId()).orElseThrow();
+        assertThat(student.getClassType()).isEqualTo(StudentClassType.EGE);
     }
 }
 

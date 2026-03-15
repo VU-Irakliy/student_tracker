@@ -18,12 +18,15 @@ import java.time.LocalTime;
 @Builder
 public class WeeklyScheduleRequest {
 
+    /** Day of week for the recurring slot. */
     @NotNull(message = "Day of week is required")
     private DayOfWeek dayOfWeek;
 
+    /** Start time in the student's timezone. */
     @NotNull(message = "Start time is required")
     private LocalTime startTime;
 
+    /** Duration of each class occurrence in minutes. */
     @NotNull(message = "Duration is required")
     @Min(value = 15, message = "Duration must be at least 15 minutes")
     @Max(value = 480, message = "Duration cannot exceed 480 minutes")

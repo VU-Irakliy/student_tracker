@@ -4,6 +4,7 @@ import com.studio.app.dto.request.CancelSessionRequest;
 import com.studio.app.dto.request.MovePaymentRequest;
 import com.studio.app.dto.request.OneOffSessionRequest;
 import com.studio.app.dto.request.PaySessionRequest;
+import com.studio.app.dto.request.UpdateSessionRequest;
 import com.studio.app.dto.response.CalendarDayResponse;
 import com.studio.app.dto.response.ClassSessionResponse;
 import com.studio.app.entity.ClassSession;
@@ -22,6 +23,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -81,6 +84,28 @@ public class ClassSessionServiceImpl implements ClassSessionService {
 
     /** {@inheritDoc} */
     @Override
+    public ClassSessionResponse updateSession(Long sessionId, UpdateSessionRequest request) {
+        var session = findActiveSession(sessionId);
+
+        Optional.ofNullable(request.getClassDate()).ifPresent(session::setClassDate);
+        Optional.ofNullable(request.getStartTime()).ifPresent(session::setStartTime);
+        Optional.ofNullable(request.getDurationMinutes()).ifPresent(session::setDurationMinutes);
+        Optional.ofNullable(request.getStatus()).ifPresent(session::setStatus);
+        Optional.ofNullable(request.getNote()).ifPresent(session::setNote);
+
+        if (request.getPaid() != null) {
+            if (request.getPaid()) {
+                markPaidInternal(session, request.getAmountOverride());
+            } else {
+                markUnpaidInternal(session);
+            }
+        }
+
+        return enrichWithConvertedPrices(sessionMapper.toResponse(sessionRepository.save(session)));
+    }
+
+    /** {@inheritDoc} */
+    @Override
     public ClassSessionResponse cancelSession(Long sessionId, CancelSessionRequest request) {
         var session = findActiveSession(sessionId);
 
@@ -112,31 +137,21 @@ public class ClassSessionServiceImpl implements ClassSessionService {
     @Override
     public ClassSessionResponse markSessionPaid(Long sessionId, PaySessionRequest request) {
         var session = findActiveSession(sessionId);
-        var student = session.getStudent();
+        markPaidInternal(session, request.getAmountOverride());
 
-        if (session.getPaymentStatus() == PaymentStatus.PAID
-                || session.getPaymentStatus() == PaymentStatus.PACKAGE) {
-            throw new BadRequestException("Session is already paid");
+        return enrichWithConvertedPrices(sessionMapper.toResponse(sessionRepository.save(session)));
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public ClassSessionResponse setSessionCompletion(Long sessionId, boolean completed) {
+        var session = findActiveSession(sessionId);
+
+        if (session.getStatus() == ClassStatus.CANCELLED) {
+            throw new BadRequestException("Cancelled session cannot change completion state");
         }
 
-        if (student.getPricingType() == PricingType.PACKAGE) {
-            // Auto-deduct from oldest active package (FIFO)
-            var pkg = packageRepository.findActivePackagesByStudent(student.getId())
-                    .stream()
-                    .findFirst()
-                    .orElseThrow(() -> new BadRequestException(
-                            "No active package with remaining classes found"));
-
-            pkg.setClassesRemaining(pkg.getClassesRemaining() - 1);
-            packageRepository.save(pkg);
-
-            session.setPackagePurchase(pkg);
-            session.setPaymentStatus(PaymentStatus.PACKAGE);
-        } else {
-            // PER_CLASS: use override amount if provided; otherwise keep the captured price
-            Optional.ofNullable(request.getAmountOverride()).ifPresent(session::setPriceCharged);
-            session.setPaymentStatus(PaymentStatus.PAID);
-        }
+        session.setStatus(completed ? ClassStatus.COMPLETED : ClassStatus.SCHEDULED);
 
         return enrichWithConvertedPrices(sessionMapper.toResponse(sessionRepository.save(session)));
     }
@@ -145,20 +160,7 @@ public class ClassSessionServiceImpl implements ClassSessionService {
     @Override
     public ClassSessionResponse cancelSessionPayment(Long sessionId) {
         var session = findActiveSession(sessionId);
-
-        if (session.getPaymentStatus() == PaymentStatus.UNPAID) {
-            throw new BadRequestException("Session has no payment to cancel");
-        }
-
-        // Return class to package if applicable
-        if (session.getPaymentStatus() == PaymentStatus.PACKAGE && session.getPackagePurchase() != null) {
-            var pkg = session.getPackagePurchase();
-            pkg.setClassesRemaining(pkg.getClassesRemaining() + 1);
-            packageRepository.save(pkg);
-            session.setPackagePurchase(null);
-        }
-
-        session.setPaymentStatus(PaymentStatus.UNPAID);
+        markUnpaidInternal(session);
         return enrichWithConvertedPrices(sessionMapper.toResponse(sessionRepository.save(session)));
     }
 
@@ -210,6 +212,13 @@ public class ClassSessionServiceImpl implements ClassSessionService {
                 .sorted(java.util.Map.Entry.comparingByKey())
                 .map(entry -> CalendarDayResponse.builder()
                         .date(entry.getKey())
+                        .totalHours(toHours(entry.getValue().stream()
+                                .mapToInt(ClassSession::getDurationMinutes)
+                                .sum()))
+                        .completedHours(toHours(entry.getValue().stream()
+                                .filter(session -> session.getStatus() == ClassStatus.COMPLETED)
+                                .mapToInt(ClassSession::getDurationMinutes)
+                                .sum()))
                         .sessions(sessionMapper.toResponseList(entry.getValue()).stream()
                                 .map(this::enrichWithConvertedPrices).toList())
                         .build())
@@ -231,8 +240,58 @@ public class ClassSessionServiceImpl implements ClassSessionService {
         return response;
     }
 
+    private BigDecimal toHours(int minutes) {
+        return BigDecimal.valueOf(minutes)
+                .divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
+    }
+
     private ClassSession findActiveSession(Long id) {
         return sessionRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("ClassSession", id));
+    }
+
+    private void markPaidInternal(ClassSession session, java.math.BigDecimal amountOverride) {
+        var student = session.getStudent();
+
+        if (session.getPaymentStatus() == PaymentStatus.PAID
+                || session.getPaymentStatus() == PaymentStatus.PACKAGE) {
+            throw new BadRequestException("Session is already paid");
+        }
+
+        if (student.getPricingType() == PricingType.PACKAGE) {
+            // Auto-deduct from oldest active package (FIFO)
+            var pkg = packageRepository.findActivePackagesByStudent(student.getId())
+                    .stream()
+                    .findFirst()
+                    .orElseThrow(() -> new BadRequestException(
+                            "No active package with remaining classes found"));
+
+            pkg.setClassesRemaining(pkg.getClassesRemaining() - 1);
+            packageRepository.save(pkg);
+
+            session.setPackagePurchase(pkg);
+            session.setPaymentStatus(PaymentStatus.PACKAGE);
+            return;
+        }
+
+        // PER_CLASS: use override amount if provided; otherwise keep captured price
+        Optional.ofNullable(amountOverride).ifPresent(session::setPriceCharged);
+        session.setPaymentStatus(PaymentStatus.PAID);
+    }
+
+    private void markUnpaidInternal(ClassSession session) {
+        if (session.getPaymentStatus() == PaymentStatus.UNPAID) {
+            throw new BadRequestException("Session has no payment to cancel");
+        }
+
+        // Return class to package if applicable
+        if (session.getPaymentStatus() == PaymentStatus.PACKAGE && session.getPackagePurchase() != null) {
+            var pkg = session.getPackagePurchase();
+            pkg.setClassesRemaining(pkg.getClassesRemaining() + 1);
+            packageRepository.save(pkg);
+            session.setPackagePurchase(null);
+        }
+
+        session.setPaymentStatus(PaymentStatus.UNPAID);
     }
 }

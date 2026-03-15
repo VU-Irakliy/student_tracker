@@ -2,6 +2,7 @@ package com.studio.app.entity;
 
 import com.studio.app.enums.Currency;
 import com.studio.app.enums.PricingType;
+import com.studio.app.enums.StudentClassType;
 import com.studio.app.enums.StudioTimezone;
 import jakarta.persistence.*;
 import lombok.*;
@@ -29,17 +30,20 @@ import java.util.List;
 @Builder
 public class Student extends BaseEntity {
 
+    /** Database identifier of the student. */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** Student first name. */
     @Column(name = "first_name", nullable = false)
     private String firstName;
 
+    /** Student last name. */
     @Column(name = "last_name", nullable = false)
     private String lastName;
 
-
+    /** Optional contact phone number for the student or family. */
     @Column(name = "phone_number")
     private String phoneNumber;
 
@@ -65,9 +69,20 @@ public class Student extends BaseEntity {
     @Column(name = "timezone", nullable = false)
     private StudioTimezone timezone;
 
+    /** Program type this student studies (casual, exam prep, etc.). */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "class_type", nullable = false)
+    @Builder.Default
+    private StudentClassType classType = StudentClassType.CASUAL;
+
     /** Notes visible to the teacher/admin. */
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
+
+    /** True when the student has at least one past unpaid session after nightly debtor check. */
+    @Column(name = "debtor", nullable = false)
+    @Builder.Default
+    private boolean debtor = false;
 
     /** Recurring weekly schedule entries for this student. */
     @OneToMany(mappedBy = "student", cascade = CascadeType.ALL, orphanRemoval = true)

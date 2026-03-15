@@ -4,12 +4,12 @@
 -- ============================================================
 
 -- ── Students ────────────────────────────────────────────────
-INSERT INTO studio.students (id, first_name, last_name, phone_number, pricing_type, price_per_class, currency, timezone, notes, created_at, updated_at, deleted)
+INSERT INTO studio.students (id, first_name, last_name, phone_number, pricing_type, price_per_class, currency, timezone, class_type, notes, debtor, created_at, updated_at, deleted)
 VALUES
-    (1, 'Ana',   'García',  '+34600111222', 'PER_CLASS', 30.00, 'EUROS',   'SPAIN',          'Intermediate level',  NOW(), NOW(), FALSE),
-    (2, 'Ivan',  'Petrov',  '+79001112233', 'PACKAGE',   NULL,  'RUBLES',  'RUSSIA_MOSCOW',  NULL,                  NOW(), NOW(), FALSE),
-    (3, 'John',  'Smith',   '+12025551234', 'PER_CLASS', 40.00, 'DOLLARS', 'SPAIN',          NULL,                  NOW(), NOW(), FALSE),
-    (4, 'Deleted','User',   NULL,           'PER_CLASS', 25.00, 'EUROS',   'SPAIN',          NULL,                  NOW(), NOW(), TRUE);
+    (1, 'Ana',   'García',  '+34600111222', 'PER_CLASS', 30.00, 'EUROS',   'SPAIN',          'EGE',    'Intermediate level',  FALSE, NOW(), NOW(), FALSE),
+    (2, 'Ivan',  'Petrov',  '+79001112233', 'PACKAGE',   NULL,  'RUBLES',  'RUSSIA_MOSCOW',  'OGE',    NULL,                  FALSE, NOW(), NOW(), FALSE),
+    (3, 'John',  'Smith',   '+12025551234', 'PER_CLASS', 40.00, 'DOLLARS', 'SPAIN',          'IELTS',  NULL,                  FALSE, NOW(), NOW(), FALSE),
+    (4, 'Deleted','User',   NULL,           'PER_CLASS', 25.00, 'EUROS',   'SPAIN',          'CASUAL', NULL,                  FALSE, NOW(), NOW(), TRUE);
 
 -- ── Weekly schedules ────────────────────────────────────────
 INSERT INTO studio.weekly_schedules (id, student_id, day_of_week, start_time, duration_minutes, created_at, updated_at, deleted)

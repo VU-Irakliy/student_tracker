@@ -2,6 +2,7 @@ package com.studio.app.dto.response;
 
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -15,6 +16,12 @@ import java.util.List;
 @Builder
 public class CalendarDayResponse {
 
+    /** Calendar date represented by this aggregate. */
     private LocalDate date;
+    /** Sum of all session durations for this day, expressed in hours. */
+    private BigDecimal totalHours;
+    /** Sum of durations for sessions with status COMPLETED, expressed in hours. */
+    private BigDecimal completedHours;
+    /** Sessions that belong to this date. */
     private List<ClassSessionResponse> sessions;
 }

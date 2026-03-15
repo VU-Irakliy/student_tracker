@@ -20,6 +20,7 @@ import lombok.*;
 @Builder
 public class CancelSessionRequest {
 
+    /** Whether cancellation should preserve the current paid state. */
     @NotNull(message = "keepAsPaid flag is required")
     private Boolean keepAsPaid;
 

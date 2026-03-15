@@ -22,6 +22,8 @@ class CalendarControllerIT extends BaseIntegrationTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$").isArray())
                     .andExpect(jsonPath("$[*].date", everyItem(notNullValue())))
+                    .andExpect(jsonPath("$[*].totalHours", everyItem(notNullValue())))
+                    .andExpect(jsonPath("$[*].completedHours", everyItem(notNullValue())))
                     .andExpect(jsonPath("$[*].sessions").exists());
         }
 
@@ -32,6 +34,8 @@ class CalendarControllerIT extends BaseIntegrationTest {
                             .param("to", "2026-03-31"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$[0].date").value("2026-03-02"))
+                    .andExpect(jsonPath("$[0].totalHours").value(1.0))
+                    .andExpect(jsonPath("$[0].completedHours").value(1.0))
                     .andExpect(jsonPath("$[0].sessions", hasSize(1)))
                     .andExpect(jsonPath("$[0].sessions[0].studentName").value("Ana García"));
         }

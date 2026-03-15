@@ -15,9 +15,11 @@ import java.time.LocalDateTime;
 @MappedSuperclass
 public abstract class BaseEntity {
 
+    /** Timestamp when the record was first persisted. */
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    /** Timestamp when the record was last updated. */
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
@@ -25,12 +27,14 @@ public abstract class BaseEntity {
     @Column(name = "deleted", nullable = false)
     private boolean deleted = false;
 
+    /** Initializes audit timestamps before the first insert. */
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
     }
 
+    /** Refreshes update timestamp before each update. */
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();

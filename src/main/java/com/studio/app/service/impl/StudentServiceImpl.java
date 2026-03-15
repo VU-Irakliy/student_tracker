@@ -4,6 +4,7 @@ import com.studio.app.dto.request.CreateStudentRequest;
 import com.studio.app.dto.request.UpdateStudentRequest;
 import com.studio.app.dto.response.StudentResponse;
 import com.studio.app.entity.Student;
+import com.studio.app.enums.StudentClassType;
 import com.studio.app.exception.ResourceNotFoundException;
 import com.studio.app.mapper.StudentMapper;
 import com.studio.app.repository.ClassSessionRepository;
@@ -46,25 +47,27 @@ public class StudentServiceImpl implements StudentService {
                 .pricePerClass(request.getPricePerClass())
                 .currency(request.getCurrency())
                 .timezone(request.getTimezone())
+                .classType(Optional.ofNullable(request.getClassType()).orElse(StudentClassType.CASUAL))
                 .notes(request.getNotes())
                 .build();
 
-        return enrichWithConvertedPrices(studentMapper.toResponse(studentRepository.save(student)));
+        return toResponse(studentRepository.save(student));
     }
 
     /** {@inheritDoc} */
     @Override
     @Transactional(readOnly = true)
     public List<StudentResponse> getAllStudents() {
-        return studentMapper.toResponseList(studentRepository.findAllByDeletedFalse())
-                .stream().map(this::enrichWithConvertedPrices).toList();
+        return studentRepository.findAllByDeletedFalse().stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     /** {@inheritDoc} */
     @Override
     @Transactional(readOnly = true)
     public StudentResponse getStudentById(Long id) {
-        return enrichWithConvertedPrices(studentMapper.toResponse(findActiveStudent(id)));
+        return toResponse(findActiveStudent(id));
     }
 
     /** {@inheritDoc} */
@@ -79,9 +82,10 @@ public class StudentServiceImpl implements StudentService {
         Optional.ofNullable(request.getPricePerClass()).ifPresent(student::setPricePerClass);
         Optional.ofNullable(request.getCurrency()).ifPresent(student::setCurrency);
         Optional.ofNullable(request.getTimezone()).ifPresent(student::setTimezone);
+        Optional.ofNullable(request.getClassType()).ifPresent(student::setClassType);
         Optional.ofNullable(request.getNotes()).ifPresent(student::setNotes);
 
-        return enrichWithConvertedPrices(studentMapper.toResponse(studentRepository.save(student)));
+        return toResponse(studentRepository.save(student));
     }
 
     /** {@inheritDoc} */
@@ -113,11 +117,19 @@ public class StudentServiceImpl implements StudentService {
     @Override
     @Transactional(readOnly = true)
     public List<StudentResponse> searchStudents(String query) {
-        return studentMapper.toResponseList(studentRepository.searchByName(query))
-                .stream().map(this::enrichWithConvertedPrices).toList();
+        return studentRepository.searchByName(query).stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────
+
+    private StudentResponse toResponse(Student student) {
+        var response = studentMapper.toResponse(student);
+        // Keep classType explicit in case generated mapper code is stale in local IDE caches.
+        response.setClassType(student.getClassType());
+        return enrichWithConvertedPrices(response);
+    }
 
     /**
      * Populates the {@code convertedPrices} field on a response by delegating

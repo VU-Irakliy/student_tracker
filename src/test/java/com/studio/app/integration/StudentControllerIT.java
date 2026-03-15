@@ -62,6 +62,7 @@ class StudentControllerIT extends BaseIntegrationTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.firstName").value("Ana"))
                     .andExpect(jsonPath("$.lastName").value("García"))
+                    .andExpect(jsonPath("$.classType").value("EGE"))
                     .andExpect(jsonPath("$.currency").value("EUROS"))
                     .andExpect(jsonPath("$.pricePerClass").value(30.00))
                     .andExpect(jsonPath("$.convertedPrices.EUROS").isNumber())
@@ -98,11 +99,13 @@ class StudentControllerIT extends BaseIntegrationTest {
                                       "pricingType": "PER_CLASS",
                                       "pricePerClass": 50.00,
                                       "currency": "DOLLARS",
-                                      "timezone": "SPAIN"
+                                      "timezone": "SPAIN",
+                                      "classType": "TOFEL"
                                     }
                                     """))
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.firstName").value("New"))
+                    .andExpect(jsonPath("$.classType").value("TOFEL"))
                     .andExpect(jsonPath("$.currency").value("DOLLARS"))
                     .andExpect(jsonPath("$.convertedPrices").isMap());
         }

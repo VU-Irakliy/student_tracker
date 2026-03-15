@@ -1,17 +1,18 @@
 package com.studio.app.service;
 
-import com.studio.app.dto.response.DailyEarningsResponse;
 import com.studio.app.dto.response.MonthlyEarningsResponse;
+import com.studio.app.dto.response.PeriodEarningsResponse;
 import com.studio.app.enums.Currency;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.util.List;
 
 /**
  * Service for calculating earnings.
- * <p>Daily earnings only include per-class (PAID) sessions.
+ * <p>Selected-period daily breakdown includes per-class (PAID) sessions.
+ * Period totals include package purchases whose payment date is in range.
  * <p>Monthly earnings include both per-class session payments and package purchase payments.
+ * <p>Weekly earnings can be obtained by requesting a 7-day daily period.
  */
 public interface EarningsService {
 
@@ -21,9 +22,10 @@ public interface EarningsService {
      * @param from         start date (inclusive)
      * @param to           end date (inclusive)
      * @param baseCurrency optional target currency to normalise totals into
-     * @return list of daily earnings, one entry per day that has at least one paid session
+     * @return selected-period earnings with daily breakdown, total earned,
+     * potential total excluding cancellations, and potential total including cancellations
      */
-    List<DailyEarningsResponse> getDailyEarnings(LocalDate from, LocalDate to, Currency baseCurrency);
+    PeriodEarningsResponse getDailyEarnings(LocalDate from, LocalDate to, Currency baseCurrency);
 
     /**
      * Returns a monthly earnings summary, including a per-day breakdown.

@@ -2,6 +2,7 @@ package com.studio.app.dto.response;
 
 import com.studio.app.enums.Currency;
 import com.studio.app.enums.PricingType;
+import com.studio.app.enums.StudentClassType;
 import com.studio.app.enums.StudioTimezone;
 import lombok.*;
 
@@ -20,13 +21,28 @@ import java.util.Map;
 @Builder
 public class StudentResponse {
 
+    /** Student identifier. */
     private Long id;
+
+    /** Student first name. */
     private String firstName;
+
+    /** Student last name. */
     private String lastName;
+
+    /** Convenience full name assembled from first and last name. */
     private String fullName;
+
+    /** Contact phone number for the student or family. */
     private String phoneNumber;
+
+    /** Active pricing model for the student. */
     private PricingType pricingType;
+
+    /** Per-class price when pricing model is {@code PER_CLASS}. */
     private BigDecimal pricePerClass;
+
+    /** Currency used for student pricing. */
     private Currency currency;
 
     /**
@@ -35,9 +51,22 @@ public class StudentResponse {
      */
     private Map<Currency, BigDecimal> convertedPrices;
 
+    /** Timezone used for scheduling and displaying class times. */
     private StudioTimezone timezone;
+
+    /** Program type this student attends. */
+    private StudentClassType classType;
+
+    /** Optional internal notes visible to teacher/admin. */
     private String notes;
+
+    /** Whether the student is currently flagged as debtor. */
+    private boolean debtor;
+
+    /** Creation timestamp of the student record. */
     private LocalDateTime createdAt;
+
+    /** Recurring weekly schedule entries for this student. */
     private List<WeeklyScheduleResponse> weeklySchedules;
 
     /** People registered as payers for this student (e.g. parents, guardians). */

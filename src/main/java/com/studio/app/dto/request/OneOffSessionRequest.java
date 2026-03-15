@@ -18,12 +18,15 @@ import java.time.LocalTime;
 @Builder
 public class OneOffSessionRequest {
 
+    /** Date of the one-off session. */
     @NotNull(message = "Date is required")
     private LocalDate classDate;
 
+    /** Start time of the one-off session. */
     @NotNull(message = "Start time is required")
     private LocalTime startTime;
 
+    /** Session duration in minutes. */
     @NotNull(message = "Duration is required")
     @Min(value = 15, message = "Duration must be at least 15 minutes")
     @Max(value = 480, message = "Duration cannot exceed 480 minutes")

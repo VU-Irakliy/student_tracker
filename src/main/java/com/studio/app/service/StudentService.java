@@ -44,7 +44,7 @@ public interface StudentService {
     StudentResponse updateStudent(Long id, UpdateStudentRequest request);
 
     /**
-     * Soft-deletes a student and all their associated sessions and schedules.
+     * Soft-deletes a student and all their future sessions and schedules.
      *
      * @param id the student ID
      */

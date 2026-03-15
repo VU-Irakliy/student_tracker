@@ -78,4 +78,61 @@ public interface ClassSessionRepository extends JpaRepository<ClassSession, Long
     List<ClassSession> findPaidSessionsByDateRange(
             @Param("from") LocalDate from,
             @Param("to") LocalDate to);
+
+    /**
+     * Finds per-class sessions in a date range that are collectible or already earned.
+     * Includes PAID and UNPAID sessions, excludes CANCELLED and PACKAGE-covered sessions.
+     */
+    @Query("""
+            SELECT cs FROM ClassSession cs
+            JOIN FETCH cs.student s
+            WHERE cs.deleted        = false
+              AND s.deleted         = false
+              AND cs.paymentStatus IN ('PAID', 'UNPAID')
+              AND cs.status        <> 'CANCELLED'
+              AND cs.classDate     >= :from
+              AND cs.classDate     <= :to
+            ORDER BY cs.classDate, cs.startTime
+            """)
+    List<ClassSession> findCollectiblePerClassSessionsByDateRange(
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
+
+    /**
+     * Finds per-class sessions in a date range that represent potential earnings,
+     * including cancelled sessions. Includes PAID and UNPAID sessions,
+     * excludes PACKAGE-covered sessions.
+     */
+    @Query("""
+            SELECT cs FROM ClassSession cs
+            JOIN FETCH cs.student s
+            WHERE cs.deleted        = false
+              AND s.deleted         = false
+              AND cs.paymentStatus IN ('PAID', 'UNPAID')
+              AND cs.classDate     >= :from
+              AND cs.classDate     <= :to
+            ORDER BY cs.classDate, cs.startTime
+            """)
+    List<ClassSession> findPotentialPerClassSessionsIncludingCancellationsByDateRange(
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
+
+    /** True when student has at least one unpaid non-cancelled session that has already happened. */
+    @Query("""
+            SELECT CASE WHEN COUNT(cs) > 0 THEN true ELSE false END
+            FROM ClassSession cs
+            WHERE cs.deleted          = false
+              AND cs.student.id       = :studentId
+              AND cs.student.deleted  = false
+              AND cs.paymentStatus    = 'UNPAID'
+              AND cs.status          <> 'CANCELLED'
+              AND (
+                    cs.classDate < :localDate
+                    OR (cs.classDate = :localDate AND cs.startTime <= :localTime)
+                  )
+            """)
+    boolean existsUnpaidOccurredSessionForStudent(
+            @Param("studentId") Long studentId,
+            @Param("localDate") LocalDate localDate,
+            @Param("localTime") java.time.LocalTime localTime);
 }

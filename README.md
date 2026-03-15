@@ -85,7 +85,8 @@ src/main/java/com/studio/app/
 │   ├── ClassStatus.java                 # SCHEDULED | COMPLETED | CANCELLED | MOVED
 │   ├── PaymentStatus.java               # UNPAID | PAID | PACKAGE | REFUNDED
 │   ├── Currency.java                    # EUROS | DOLLARS | RUBLES
-│   └── StudioTimezone.java              # SPAIN | RUSSIA_MOSCOW
+│   ├── StudioTimezone.java              # SPAIN | RUSSIA_MOSCOW
+│   └── StudentClassType.java            # CASUAL | EGE | OGE | IELTS | TOFEL
 └── exception/                           # Custom exceptions + global handler
 
 src/main/resources/
@@ -97,7 +98,7 @@ db/
 │   ├── 00_create_schema.sql
 │   ├── 01_create_tables.sql
 │   ├── 02_create_indexes.sql
-│   └── 03–04_*.sql                      # additive migrations
+│   └── 03–06_*.sql                      # additive migrations
 ├── scripts/
 │   ├── backup.ps1
 │   └── restore.ps1
@@ -116,6 +117,15 @@ docker compose up -d
 
 On **first startup** (empty `pgdata/`) the SQL scripts in `db/init/` automatically create
 the `studio` schema, all tables, and indexes. Data is persisted in `pgdata/` (git-ignored).
+
+For existing databases, run the startup helper script to automate migration checks:
+
+```powershell
+.\db\scripts\start-db.ps1
+```
+
+It starts PostgreSQL, checks `studio.schema_migration_history`, runs only pending
+`db/init/*.sql` scripts in filename order, and records each applied script.
 
 ```bash
 docker compose down        # stop (keeps data)
@@ -183,6 +193,16 @@ The SQL init scripts are the single source of truth.
 
 The restore runs inside a single transaction — if anything fails, nothing changes.
 
+### Apply Pending Init Scripts Manually
+
+If you want to trigger migration checks manually:
+
+```powershell
+.\db\scripts\apply-pending-init.ps1
+```
+
+The script skips already-applied files using `studio.schema_migration_history`.
+
 ---
 
 ## Error Logging
@@ -226,8 +246,8 @@ cached value is used as a fallback.
 | POST   | `/api/students`             | Create a student                   |
 | GET    | `/api/students`             | List all; `?search=name` to filter |
 | GET    | `/api/students/{id}`        | Get one student                    |
-| POST   | `/api/students/{id}`        | Update student (partial/patch)     |
-| POST   | `/api/students/{id}/delete` | Soft-delete student + all data     |
+| PUT    | `/api/students/{id}`        | Update student (partial)           |
+| DELETE | `/api/students/{id}`        | Soft-delete student + related data |
 
 **Create / update body (all fields optional on update):**
 ```json
@@ -239,12 +259,16 @@ cached value is used as a fallback.
   "pricePerClass": 35.00,
   "currency": "EUROS",
   "timezone": "SPAIN",
+  "classType": "CASUAL",
   "notes": "Prefers morning classes"
 }
 ```
 `pricingType`: `PER_CLASS` | `PACKAGE`  
 `currency`: `EUROS` | `DOLLARS` | `RUBLES`  
 `timezone`: `SPAIN` | `RUSSIA_MOSCOW`
+`classType`: `CASUAL` | `EGE` | `OGE` | `IELTS` | `TOFEL`
+
+Student responses also include `debtor` (boolean), maintained by the debtor batch process.
 
 ---
 
@@ -302,8 +326,10 @@ cached value is used as a fallback.
 | Method | Path                                    | Description                                                      |
 |--------|-----------------------------------------|------------------------------------------------------------------|
 | GET    | `/api/sessions/{id}`                    | Get session details                                              |
+| PUT    | `/api/sessions/{id}`                    | Update date/time/duration/status/payment/note in one request     |
 | POST   | `/api/sessions/{id}/cancel`             | Cancel session (optionally keep payment)                         |
 | POST   | `/api/sessions/{id}/pay`                | Mark as paid (auto-deducts from active package for PACKAGE type) |
+| POST   | `/api/sessions/{id}/completion`         | Set completion state via `?completed=true\|false`               |
 | POST   | `/api/sessions/{id}/cancel-payment`     | Revert payment (→ UNPAID or return slot to package)              |
 | POST   | `/api/sessions/{id}/move-payment`       | Move payment to another session                                  |
 
@@ -315,6 +341,25 @@ cached value is used as a fallback.
 **Pay (PER_CLASS with optional price override):**
 ```json
 { "amountOverride": 30.00 }
+```
+
+**Unified update (`PUT /api/sessions/{id}`):**
+```json
+{
+  "classDate": "2026-04-20",
+  "startTime": "11:00",
+  "durationMinutes": 60,
+  "status": "COMPLETED",
+  "paid": true,
+  "amountOverride": 30.00,
+  "note": "Conducted and paid"
+}
+```
+
+**Set completion state:**
+```
+POST /api/sessions/{id}/completion?completed=true
+POST /api/sessions/{id}/completion?completed=false
 ```
 
 **Move payment:**
@@ -356,13 +401,17 @@ cached value is used as a fallback.
 
 Defaults to today → next 30 days if dates are omitted.
 
+Each day entry includes:
+- `totalHours` — total class duration for that day
+- `completedHours` — duration for sessions with `status=COMPLETED`
+
 ---
 
 ### Earnings — `/api/earnings`
 
 | Method | Path                 | Description                                    |
 |--------|----------------------|------------------------------------------------|
-| GET    | `/api/earnings/daily`   | Per-day earnings for a date range           |
+| GET    | `/api/earnings/daily`   | Selected-period earnings + daily breakdown  |
 | GET    | `/api/earnings/monthly` | Monthly summary with optional base currency |
 
 Query parameters:
@@ -370,7 +419,16 @@ Query parameters:
 - `year`, `month` — for monthly endpoint
 - `baseCurrency` — `EUROS` | `DOLLARS` | `RUBLES` (optional; returns a normalised total)
 
-**Daily earnings** count only `PAID` (per-class) sessions.  
+`/api/earnings/daily` returns a period object with:
+- `dailyBreakdown` (per-day rows for `PAID` per-class sessions)
+- `totalEarned*` (includes paid per-class sessions + package purchases in range)
+- `totalCouldHaveEarnedExcludingCancellations*`
+- `totalCouldHaveEarnedIncludingCancellations*`
+
+Package purchases are included in period totals when `paymentDate` is inside `from..to`.
+
+To get **weekly earnings**, call `/api/earnings/daily` with any 7-day range.
+
 **Monthly earnings** include both per-class session payments **and** package purchase payments
 (matched by `paymentDate` within the month).
 
@@ -388,13 +446,24 @@ Query parameters:
 | Pay session (PACKAGE student)           | Auto-deducts from oldest active package (FIFO); `paymentStatus=PACKAGE`                   |
 | Pay session (no active package)         | `400 Bad Request`                                                                          |
 | Pay already-paid session                | `400 Bad Request`                                                                          |
+| Set completion state                    | `/completion?completed=true\|false` switches `status` between `COMPLETED` and `SCHEDULED` |
+| Unified session update                  | `PUT /api/sessions/{id}` can update schedule fields, status, payment toggle, and note     |
 | Move payment (source must be PAID)      | Source → `UNPAID`, target → `PAID`, price transferred                                     |
 | Student soft-delete                     | Student + schedules + payers soft-deleted; only **future** sessions deleted, past kept     |
+| Debtor status                           | After 22:00 local time, students with already-happened `UNPAID` sessions are marked debtor |
+| Debtor startup catch-up                 | On app startup, debtor recomputation runs once without waiting for 22:00                   |
 | Price capture                           | `priceCharged` copied from student at session creation time                                |
 | Package FIFO deduction                  | Oldest active package (by `paymentDate`) is consumed first                                 |
 | Currency conversion unavailable         | Stale cache used if available; otherwise `convertedPrices` map is empty (no crash)         |
 
 > 📖 See [BUSINESS_LOGIC.md](./BUSINESS_LOGIC.md) for full scenario walkthroughs.
+
+### Debtor Batch Configuration
+
+- `debtor.batch.cron` (default `0 5 * * * *`) schedules periodic debtor recomputation.
+- `debtor.batch.run-on-startup` (default `true`) triggers a catch-up run at startup.
+- Scheduled runs only apply updates for students whose local time is `22:00` or later.
+- Startup catch-up ignores the 22:00 gate so statuses are corrected immediately after downtime.
 
 ---
 

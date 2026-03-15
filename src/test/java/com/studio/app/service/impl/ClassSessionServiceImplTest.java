@@ -4,6 +4,7 @@ import com.studio.app.dto.request.CancelSessionRequest;
 import com.studio.app.dto.request.MovePaymentRequest;
 import com.studio.app.dto.request.OneOffSessionRequest;
 import com.studio.app.dto.request.PaySessionRequest;
+import com.studio.app.dto.request.UpdateSessionRequest;
 import com.studio.app.dto.response.ClassSessionResponse;
 import com.studio.app.entity.ClassSession;
 import com.studio.app.entity.PackagePurchase;
@@ -182,6 +183,115 @@ class ClassSessionServiceImplTest {
             sessionService.getSessionsForStudent(1L, null, null);
 
             verify(sessionRepository).findByStudentIdAndDeletedFalseOrderByClassDateAscStartTimeAsc(1L);
+        }
+    }
+
+    @Nested
+    class GetCalendar {
+
+        @Test
+        void shouldCalculateTotalAndCompletedHoursPerDay() {
+            var day1Completed = ClassSession.builder()
+                    .id(100L).student(perClassStudent)
+                    .classDate(LocalDate.of(2026, 3, 20))
+                    .startTime(LocalTime.of(9, 0))
+                    .durationMinutes(90)
+                    .status(ClassStatus.COMPLETED)
+                    .build();
+
+            var day1Scheduled = ClassSession.builder()
+                    .id(101L).student(perClassStudent)
+                    .classDate(LocalDate.of(2026, 3, 20))
+                    .startTime(LocalTime.of(11, 0))
+                    .durationMinutes(30)
+                    .status(ClassStatus.SCHEDULED)
+                    .build();
+
+            var day2Completed = ClassSession.builder()
+                    .id(102L).student(perClassStudent)
+                    .classDate(LocalDate.of(2026, 3, 21))
+                    .startTime(LocalTime.of(10, 0))
+                    .durationMinutes(60)
+                    .status(ClassStatus.COMPLETED)
+                    .build();
+
+            when(sessionRepository.findCalendarSessions(LocalDate.of(2026, 3, 20), LocalDate.of(2026, 3, 21)))
+                    .thenReturn(List.of(day1Completed, day1Scheduled, day2Completed));
+
+            when(sessionMapper.toResponseList(anyList())).thenAnswer(invocation -> {
+                @SuppressWarnings("unchecked")
+                var entities = (List<ClassSession>) invocation.getArgument(0);
+                return entities.stream().map(entity -> ClassSessionResponse.builder()
+                        .id(entity.getId())
+                        .classDate(entity.getClassDate())
+                        .startTime(entity.getStartTime())
+                        .durationMinutes(entity.getDurationMinutes())
+                        .status(entity.getStatus())
+                        .build()).toList();
+            });
+
+            var result = sessionService.getCalendar(LocalDate.of(2026, 3, 20), LocalDate.of(2026, 3, 21));
+
+            assertThat(result).hasSize(2);
+            assertThat(result.get(0).getDate()).isEqualTo(LocalDate.of(2026, 3, 20));
+            assertThat(result.get(0).getTotalHours()).isEqualByComparingTo("2.00");
+            assertThat(result.get(0).getCompletedHours()).isEqualByComparingTo("1.50");
+            assertThat(result.get(1).getDate()).isEqualTo(LocalDate.of(2026, 3, 21));
+            assertThat(result.get(1).getTotalHours()).isEqualByComparingTo("1.00");
+            assertThat(result.get(1).getCompletedHours()).isEqualByComparingTo("1.00");
+        }
+    }
+
+    @Nested
+    class UpdateSession {
+
+        @Test
+        void shouldUpdateDateStatusAndNoteInOneRequest() {
+            when(sessionRepository.findByIdAndDeletedFalse(10L)).thenReturn(Optional.of(session));
+            when(sessionRepository.save(any())).thenReturn(session);
+            when(sessionMapper.toResponse(session)).thenReturn(sessionResponse);
+            when(currencyConversionService.convertToAll(any(), any())).thenReturn(Collections.emptyMap());
+
+            sessionService.updateSession(10L, UpdateSessionRequest.builder()
+                    .classDate(LocalDate.of(2026, 3, 22))
+                    .status(ClassStatus.COMPLETED)
+                    .note("Conducted online")
+                    .build());
+
+            assertThat(session.getClassDate()).isEqualTo(LocalDate.of(2026, 3, 22));
+            assertThat(session.getStatus()).isEqualTo(ClassStatus.COMPLETED);
+            assertThat(session.getNote()).isEqualTo("Conducted online");
+        }
+
+        @Test
+        void shouldTogglePaymentToPaidFromUpdateEndpoint() {
+            when(sessionRepository.findByIdAndDeletedFalse(10L)).thenReturn(Optional.of(session));
+            when(sessionRepository.save(any())).thenReturn(session);
+            when(sessionMapper.toResponse(session)).thenReturn(sessionResponse);
+            when(currencyConversionService.convertToAll(any(), any())).thenReturn(Collections.emptyMap());
+
+            sessionService.updateSession(10L, UpdateSessionRequest.builder()
+                    .paid(true)
+                    .amountOverride(new BigDecimal("28.00"))
+                    .build());
+
+            assertThat(session.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
+            assertThat(session.getPriceCharged()).isEqualByComparingTo("28.00");
+        }
+
+        @Test
+        void shouldTogglePaymentToUnpaidFromUpdateEndpoint() {
+            session.setPaymentStatus(PaymentStatus.PAID);
+            when(sessionRepository.findByIdAndDeletedFalse(10L)).thenReturn(Optional.of(session));
+            when(sessionRepository.save(any())).thenReturn(session);
+            when(sessionMapper.toResponse(session)).thenReturn(sessionResponse);
+            when(currencyConversionService.convertToAll(any(), any())).thenReturn(Collections.emptyMap());
+
+            sessionService.updateSession(10L, UpdateSessionRequest.builder()
+                    .paid(false)
+                    .build());
+
+            assertThat(session.getPaymentStatus()).isEqualTo(PaymentStatus.UNPAID);
         }
     }
 
@@ -433,6 +543,35 @@ class ClassSessionServiceImplTest {
                     MovePaymentRequest.builder().targetSessionId(11L).build()))
                     .isInstanceOf(BadRequestException.class)
                     .hasMessageContaining("Target session is already paid");
+        }
+    }
+
+    @Nested
+    class CompleteSession {
+
+        @Test
+        void shouldMarkCompleted() {
+            when(sessionRepository.findByIdAndDeletedFalse(10L)).thenReturn(Optional.of(session));
+            when(sessionRepository.save(any())).thenReturn(session);
+            when(sessionMapper.toResponse(session)).thenReturn(sessionResponse);
+            when(currencyConversionService.convertToAll(any(), any())).thenReturn(Collections.emptyMap());
+
+            sessionService.setSessionCompletion(10L, true);
+
+            assertThat(session.getStatus()).isEqualTo(ClassStatus.COMPLETED);
+        }
+
+        @Test
+        void shouldMarkIncompletedToScheduled() {
+            session.setStatus(ClassStatus.COMPLETED);
+            when(sessionRepository.findByIdAndDeletedFalse(10L)).thenReturn(Optional.of(session));
+            when(sessionRepository.save(any())).thenReturn(session);
+            when(sessionMapper.toResponse(session)).thenReturn(sessionResponse);
+            when(currencyConversionService.convertToAll(any(), any())).thenReturn(Collections.emptyMap());
+
+            sessionService.setSessionCompletion(10L, false);
+
+            assertThat(session.getStatus()).isEqualTo(ClassStatus.SCHEDULED);
         }
     }
 }

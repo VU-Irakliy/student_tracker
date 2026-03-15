@@ -4,6 +4,7 @@ import com.studio.app.constant.ApiConstants;
 import com.studio.app.dto.request.CancelSessionRequest;
 import com.studio.app.dto.request.MovePaymentRequest;
 import com.studio.app.dto.request.PaySessionRequest;
+import com.studio.app.dto.request.UpdateSessionRequest;
 import com.studio.app.dto.response.ClassSessionResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,6 +29,20 @@ public interface SessionApi {
     @Operation(summary = "Get a session by ID", description = "Returns a single class session.")
     @GetMapping("/{sessionId}")
     ResponseEntity<ClassSessionResponse> getSessionById(@PathVariable Long sessionId);
+
+    /**
+     * Partially updates a session in one request (date/time/duration/status/payment/note).
+     * Payment can be toggled via {@code paid=true|false}; dedicated pay/unpay endpoints remain available.
+     *
+     * @param sessionId the ID of the session
+     * @param request   partial fields to update
+     * @return the updated {@link ClassSessionResponse}
+     */
+    @Operation(summary = "Update a session",
+            description = "Partially updates session data (date, time, duration, status, paid flag, note) in a single endpoint.")
+    @PutMapping("/{sessionId}")
+    ResponseEntity<ClassSessionResponse> updateSession(@PathVariable Long sessionId,
+                                                       @Valid @RequestBody UpdateSessionRequest request);
 
     /**
      * Cancels a class session. Use {@code keepAsPaid} to retain payment or let it revert to unpaid.
@@ -56,6 +71,18 @@ public interface SessionApi {
     @PostMapping("/{sessionId}/pay")
     ResponseEntity<ClassSessionResponse> markPaid(@PathVariable Long sessionId,
                                                   @RequestBody(required = false) PaySessionRequest request);
+
+    /**
+     * Sets session completion state.
+     *
+     * @param sessionId  the session ID
+     * @param completed  true -> COMPLETED, false -> SCHEDULED
+     * @return the updated {@link ClassSessionResponse}
+     */
+    @Operation(summary = "Set session completion", description = "Sets session status to COMPLETED when completed=true, otherwise SCHEDULED.")
+    @PostMapping("/{sessionId}/completion")
+    ResponseEntity<ClassSessionResponse> setCompletion(@PathVariable Long sessionId,
+                                                       @RequestParam boolean completed);
 
     /**
      * Reverts a session to UNPAID. For package sessions, the class is returned to the package.

@@ -57,6 +57,13 @@ class EarningsServiceImplTest {
                 .currency(Currency.RUBLES)
                 .timezone(StudioTimezone.RUSSIA_MOSCOW)
                 .build();
+
+        when(sessionRepository.findCollectiblePerClassSessionsByDateRange(any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(List.of());
+        when(sessionRepository.findPotentialPerClassSessionsIncludingCancellationsByDateRange(any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(List.of());
+        when(packageRepository.findByPaymentDateRange(any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(List.of());
     }
 
     private ClassSession paidSession(Long id, Student student, LocalDate date,
@@ -86,7 +93,7 @@ class EarningsServiceImplTest {
 
             var result = earningsService.getDailyEarnings(from, to, null);
 
-            assertThat(result).isEmpty();
+            assertThat(result.getDailyBreakdown()).isEmpty();
         }
 
         @Test
@@ -106,15 +113,16 @@ class EarningsServiceImplTest {
 
             var result = earningsService.getDailyEarnings(from, to, null);
 
-            assertThat(result).hasSize(2);
+            assertThat(result.getDailyBreakdown()).hasSize(2);
+            var daily = result.getDailyBreakdown();
             // March 5 — 2 sessions, 60 EUR total
-            assertThat(result.get(0).getDate()).isEqualTo(LocalDate.of(2026, 3, 5));
-            assertThat(result.get(0).getSessionCount()).isEqualTo(2);
-            assertThat(result.get(0).getEarningsByCurrency().get(Currency.EUROS))
+            assertThat(daily.get(0).getDate()).isEqualTo(LocalDate.of(2026, 3, 5));
+            assertThat(daily.get(0).getSessionCount()).isEqualTo(2);
+            assertThat(daily.get(0).getEarningsByCurrency().get(Currency.EUROS))
                     .isEqualByComparingTo("60.00");
             // March 10 — 1 session, 35 EUR
-            assertThat(result.get(1).getDate()).isEqualTo(LocalDate.of(2026, 3, 10));
-            assertThat(result.get(1).getSessionCount()).isEqualTo(1);
+            assertThat(daily.get(1).getDate()).isEqualTo(LocalDate.of(2026, 3, 10));
+            assertThat(daily.get(1).getSessionCount()).isEqualTo(1);
         }
 
         @Test
@@ -133,8 +141,8 @@ class EarningsServiceImplTest {
 
             var result = earningsService.getDailyEarnings(from, to, null);
 
-            assertThat(result).hasSize(1);
-            var day = result.get(0);
+            assertThat(result.getDailyBreakdown()).hasSize(1);
+            var day = result.getDailyBreakdown().get(0);
             assertThat(day.getEarningsByCurrency()).containsKey(Currency.EUROS);
             assertThat(day.getEarningsByCurrency()).containsKey(Currency.RUBLES);
             assertThat(day.getEarningsByCurrency().get(Currency.EUROS))
@@ -163,9 +171,9 @@ class EarningsServiceImplTest {
 
             var result = earningsService.getDailyEarnings(from, to, Currency.EUROS);
 
-            assertThat(result).hasSize(1);
-            assertThat(result.get(0).getTotalInBaseCurrency()).isEqualByComparingTo("19.80");
-            assertThat(result.get(0).getBaseCurrency()).isEqualTo(Currency.EUROS);
+            assertThat(result.getDailyBreakdown()).hasSize(1);
+            assertThat(result.getDailyBreakdown().get(0).getTotalInBaseCurrency()).isEqualByComparingTo("19.80");
+            assertThat(result.getDailyBreakdown().get(0).getBaseCurrency()).isEqualTo(Currency.EUROS);
         }
 
         @Test
@@ -181,7 +189,7 @@ class EarningsServiceImplTest {
 
             var result = earningsService.getDailyEarnings(from, to, null);
 
-            assertThat(result.get(0).getTotalInBaseCurrency()).isNull();
+            assertThat(result.getDailyBreakdown().get(0).getTotalInBaseCurrency()).isNull();
         }
 
         @Test
@@ -199,7 +207,72 @@ class EarningsServiceImplTest {
 
             var result = earningsService.getDailyEarnings(from, to, null);
 
-            assertThat(result.get(0).getDate()).isBefore(result.get(1).getDate());
+            assertThat(result.getDailyBreakdown().get(0).getDate())
+                    .isBefore(result.getDailyBreakdown().get(1).getDate());
+        }
+
+        @Test
+        void shouldIncludePackagesInPeriodTotalsWhenPaymentDateInRange() {
+            var from = LocalDate.of(2026, 3, 1);
+            var to = LocalDate.of(2026, 3, 31);
+
+            var paid = paidSession(1L, euroStudent, LocalDate.of(2026, 3, 5),
+                    new BigDecimal("30.00"), Currency.EUROS);
+            var unpaidCollectible = ClassSession.builder()
+                    .id(2L).student(euroStudent)
+                    .classDate(LocalDate.of(2026, 3, 7))
+                    .startTime(LocalTime.of(11, 0))
+                    .durationMinutes(60)
+                    .priceCharged(new BigDecimal("20.00"))
+                    .currency(Currency.EUROS)
+                    .build();
+            unpaidCollectible.setPaymentStatus(PaymentStatus.UNPAID);
+
+            var cancelledPotential = ClassSession.builder()
+                    .id(3L).student(euroStudent)
+                    .classDate(LocalDate.of(2026, 3, 8))
+                    .startTime(LocalTime.of(12, 0))
+                    .durationMinutes(60)
+                    .priceCharged(new BigDecimal("15.00"))
+                    .currency(Currency.EUROS)
+                    .build();
+            cancelledPotential.setPaymentStatus(PaymentStatus.UNPAID);
+            cancelledPotential.setStatus(com.studio.app.enums.ClassStatus.CANCELLED);
+
+            var pkg = PackagePurchase.builder()
+                    .id(10L).student(rubleStudent)
+                    .amountPaid(new BigDecimal("15000.00"))
+                    .currency(Currency.RUBLES)
+                    .paymentDate(LocalDate.of(2026, 3, 10))
+                    .totalClasses(10).classesRemaining(10)
+                    .build();
+
+            when(sessionRepository.findPaidSessionsByDateRange(from, to)).thenReturn(List.of(paid));
+            when(sessionRepository.findCollectiblePerClassSessionsByDateRange(from, to))
+                    .thenReturn(List.of(paid, unpaidCollectible));
+            when(sessionRepository.findPotentialPerClassSessionsIncludingCancellationsByDateRange(from, to))
+                    .thenReturn(List.of(paid, unpaidCollectible, cancelledPotential));
+            when(packageRepository.findByPaymentDateRange(from, to)).thenReturn(List.of(pkg));
+
+            var result = earningsService.getDailyEarnings(from, to, null);
+
+            assertThat(result.getTotalEarnedByCurrency().get(Currency.EUROS)).isEqualByComparingTo("30.00");
+            assertThat(result.getTotalEarnedByCurrency().get(Currency.RUBLES)).isEqualByComparingTo("15000.00");
+
+            assertThat(result.getTotalCouldHaveEarnedExcludingCancellationsByCurrency().get(Currency.EUROS))
+                    .isEqualByComparingTo("50.00");
+            assertThat(result.getTotalCouldHaveEarnedExcludingCancellationsByCurrency().get(Currency.RUBLES))
+                    .isEqualByComparingTo("15000.00");
+
+            assertThat(result.getTotalCouldHaveEarnedIncludingCancellationsByCurrency().get(Currency.EUROS))
+                    .isEqualByComparingTo("65.00");
+            assertThat(result.getTotalCouldHaveEarnedIncludingCancellationsByCurrency().get(Currency.RUBLES))
+                    .isEqualByComparingTo("15000.00");
+
+            // Daily breakdown remains per-class paid sessions only.
+            assertThat(result.getDailyBreakdown()).hasSize(1);
+            assertThat(result.getDailyBreakdown().get(0).getEarningsByCurrency().containsKey(Currency.RUBLES))
+                    .isFalse();
         }
     }
 

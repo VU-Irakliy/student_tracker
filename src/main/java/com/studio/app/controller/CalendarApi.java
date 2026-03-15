@@ -27,11 +27,13 @@ public interface CalendarApi {
      *
      * @param from the start date of the range (inclusive), or {@code null} for today
      * @param to   the end date of the range (inclusive), or {@code null} for 30 days after {@code from}
-     * @return a list of {@link CalendarDayResponse} objects grouped by day
+     * @return a list of {@link CalendarDayResponse} objects grouped by day,
+     * including per-day total hours and completed hours
      */
     @Operation(summary = "Get calendar",
             description = "Returns all classes grouped by day for the given date range. "
-                    + "Defaults to today through the next 30 days if dates are omitted.")
+                    + "Defaults to today through the next 30 days if dates are omitted. "
+                    + "Each day includes total scheduled hours and completed hours.")
     @GetMapping
     ResponseEntity<List<CalendarDayResponse>> getCalendar(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,

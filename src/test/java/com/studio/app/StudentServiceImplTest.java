@@ -9,6 +9,7 @@ import com.studio.app.entity.Student;
 import com.studio.app.entity.WeeklySchedule;
 import com.studio.app.enums.Currency;
 import com.studio.app.enums.PricingType;
+import com.studio.app.enums.StudentClassType;
 import com.studio.app.enums.StudioTimezone;
 import com.studio.app.exception.ResourceNotFoundException;
 import com.studio.app.mapper.StudentMapper;
@@ -64,6 +65,7 @@ class StudentServiceImplTest {
                 .pricePerClass(new BigDecimal("30.00"))
                 .currency(Currency.EUROS)
                 .timezone(StudioTimezone.SPAIN)
+                .classType(StudentClassType.CASUAL)
                 .build();
 
         studentResponse = StudentResponse.builder()
@@ -74,6 +76,7 @@ class StudentServiceImplTest {
                 .pricingType(PricingType.PER_CLASS)
                 .pricePerClass(new BigDecimal("30.00"))
                 .currency(Currency.EUROS)
+                .classType(StudentClassType.CASUAL)
                 .build();
     }
 
@@ -88,6 +91,7 @@ class StudentServiceImplTest {
                     .pricePerClass(new BigDecimal("30.00"))
                     .currency(Currency.EUROS)
                     .timezone(StudioTimezone.SPAIN)
+                    .classType(StudentClassType.EGE)
                     .build();
 
             when(studentRepository.save(any())).thenReturn(activeStudent);
@@ -108,12 +112,14 @@ class StudentServiceImplTest {
                     .pricePerClass(new BigDecimal("2000.00"))
                     .currency(Currency.RUBLES)
                     .timezone(StudioTimezone.RUSSIA_MOSCOW)
+                    .classType(StudentClassType.OGE)
                     .build();
 
             var rubStudent = Student.builder()
                     .id(2L).firstName("Ivan").lastName("Petrov")
                     .currency(Currency.RUBLES).pricePerClass(new BigDecimal("2000.00"))
                     .pricingType(PricingType.PER_CLASS).timezone(StudioTimezone.RUSSIA_MOSCOW)
+                    .classType(StudentClassType.OGE)
                     .build();
 
             var rubResponse = StudentResponse.builder()
@@ -141,11 +147,13 @@ class StudentServiceImplTest {
                     .firstName("Pkg").lastName("Student")
                     .pricingType(PricingType.PACKAGE)
                     .timezone(StudioTimezone.SPAIN)
+                    .classType(StudentClassType.CASUAL)
                     .build();
 
             var pkgStudent = Student.builder()
                     .id(3L).firstName("Pkg").lastName("Student")
                     .pricingType(PricingType.PACKAGE).timezone(StudioTimezone.SPAIN)
+                    .classType(StudentClassType.CASUAL)
                     .build();
 
             var pkgResponse = StudentResponse.builder()
@@ -186,8 +194,7 @@ class StudentServiceImplTest {
         @Test
         void getAllStudents_shouldReturnOnlyActive() {
             when(studentRepository.findAllByDeletedFalse()).thenReturn(List.of(activeStudent));
-            when(studentMapper.toResponseList(List.of(activeStudent)))
-                    .thenReturn(List.of(studentResponse));
+            when(studentMapper.toResponse(activeStudent)).thenReturn(studentResponse);
             when(currencyConversionService.convertToAll(any(), any())).thenReturn(Collections.emptyMap());
 
             var result = studentService.getAllStudents();
@@ -198,8 +205,7 @@ class StudentServiceImplTest {
         @Test
         void searchStudents_shouldDelegateToRepository() {
             when(studentRepository.searchByName("Ana")).thenReturn(List.of(activeStudent));
-            when(studentMapper.toResponseList(List.of(activeStudent)))
-                    .thenReturn(List.of(studentResponse));
+            when(studentMapper.toResponse(activeStudent)).thenReturn(studentResponse);
             when(currencyConversionService.convertToAll(any(), any())).thenReturn(Collections.emptyMap());
 
             var result = studentService.searchStudents("Ana");
@@ -300,6 +306,18 @@ class StudentServiceImplTest {
                     .notes("Updated note").build());
 
             assertThat(activeStudent.getNotes()).isEqualTo("Updated note");
+        }
+
+        @Test
+        void shouldUpdateClassType() {
+            when(studentRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(activeStudent));
+            when(studentRepository.save(any())).thenReturn(activeStudent);
+            when(studentMapper.toResponse(activeStudent)).thenReturn(StudentResponse.builder().build());
+
+            studentService.updateStudent(1L, UpdateStudentRequest.builder()
+                    .classType(StudentClassType.IELTS).build());
+
+            assertThat(activeStudent.getClassType()).isEqualTo(StudentClassType.IELTS);
         }
 
         @Test

@@ -135,6 +135,35 @@ class SessionControllerIT extends BaseIntegrationTest {
     }
 
     @Nested
+    class UpdateSession {
+
+        @Test
+        void shouldUpdateInSingleEndpoint() throws Exception {
+            mockMvc.perform(put("/api/sessions/2")
+                            .contentType(JSON)
+                            .content("""
+                                    {
+                                      "classDate": "2026-03-18",
+                                      "startTime": "15:30",
+                                      "durationMinutes": 90,
+                                      "status": "COMPLETED",
+                                      "paid": true,
+                                      "amountOverride": 35.00,
+                                      "note": "Conducted and paid"
+                                    }
+                                    """))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.classDate").value("2026-03-18"))
+                    .andExpect(jsonPath("$.startTime").value("15:30:00"))
+                    .andExpect(jsonPath("$.durationMinutes").value(90))
+                    .andExpect(jsonPath("$.status").value("COMPLETED"))
+                    .andExpect(jsonPath("$.paymentStatus").value("PAID"))
+                    .andExpect(jsonPath("$.priceCharged").value(35.00))
+                    .andExpect(jsonPath("$.note").value("Conducted and paid"));
+        }
+    }
+
+    @Nested
     class MarkPaid {
 
         @Test
@@ -166,6 +195,31 @@ class SessionControllerIT extends BaseIntegrationTest {
                             .contentType(JSON)
                             .content("{}"))
                     .andExpect(status().isBadRequest());
+        }
+    }
+
+    @Nested
+    class CompleteIncompleted {
+
+        @Test
+        void shouldMarkCompleted() throws Exception {
+            mockMvc.perform(post("/api/sessions/2/completion")
+                            .param("completed", "true"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("COMPLETED"));
+        }
+
+        @Test
+        void shouldMarkIncompletedToScheduled() throws Exception {
+            mockMvc.perform(post("/api/sessions/2/completion")
+                            .param("completed", "true"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("COMPLETED"));
+
+            mockMvc.perform(post("/api/sessions/2/completion")
+                            .param("completed", "false"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("SCHEDULED"));
         }
     }
 

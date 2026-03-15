@@ -48,10 +48,16 @@ Each student has a profile with:
 - **Price per class** — only if they pay per class; package students don't have a per-class price
 - **Currency** — Euros, Dollars, or Rubles
 - **Timezone** — Spain or Russia (Moscow) — used for display purposes
+- **Class type** — Casual, EGE, OGE, IELTS, or TOFEL
 - **Notes** — anything you want to remember about them
+- **Debtor flag** — automatically turns on if a lesson has happened and is still unpaid
 
 You can update any of this at any time. Changing the pricing type (e.g. from per-class to
 package) only affects new payments going forward — old records stay as they were.
+
+The debtor flag is not edited manually. The system updates it in batch mode:
+- after 10:00 PM in each student's local timezone, and
+- once at app startup (catch-up), so status is corrected after downtime.
 
 ---
 
@@ -103,6 +109,15 @@ If a student has an extra class that's not part of their regular schedule — fo
 a make-up lesson or a class moved from another day — you can add it as a **one-off**.
 One-off classes work exactly like regular ones but are flagged separately so you can tell
 them apart.
+
+### Updating class details in one place
+
+You can update key class information in a single action: date, time, duration, note,
+class status, and whether it is paid/unpaid.
+
+There is also a separate quick action to toggle completion state:
+- completed = class conducted
+- incompleted = back to scheduled
 
 ---
 
@@ -273,13 +288,19 @@ calculated.
 
 The app can show you how much money you've earned.
 
-### Daily view
+### Daily view (selected period)
 
-Shows earnings **day by day** for a date range you choose.
+Shows a selected period (for example, a week) with:
 
-- Only counts classes that were paid **individually** (Paid status)
-- Package classes are **not counted here** — the money for those was counted when
-  the package was purchased, not when each class was used
+- **Daily breakdown** day by day (only individually paid classes, status = Paid)
+- **Total earned** for the whole selected period
+- **Total could have earned (excluding cancellations)**
+- **Total could have earned (including cancellations)**
+
+Package classes are still not counted in each day row. But package **purchases** are
+included in period totals when their payment date is inside the selected date range.
+
+If you want a weekly report, just request a 7-day range.
 
 ### Monthly view
 
@@ -362,6 +383,13 @@ show — but all the original values are still there.
 
 **"I want to see what classes haven't been paid yet."**
 > Filter a student's classes by payment status "Unpaid" to see everything outstanding.
+
+**"When does someone become a debtor?"**
+> If a class has already happened and is still unpaid, the student is marked as debtor.
+> This check runs after 10:00 PM local time and also once on app startup.
+
+**"When does debtor status go back to normal?"**
+> As soon as all happened unpaid classes are paid, the next batch check switches debtor off.
 
 **"A student who pays per-class wants to switch to packages."**
 > Update their profile to change the pricing type. Old paid classes stay as they are.

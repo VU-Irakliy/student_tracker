@@ -27,10 +27,12 @@ import java.time.LocalDate;
 @Builder
 public class PackagePurchase extends BaseEntity {
 
+    /** Database identifier of the package purchase record. */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** Student who bought this package. */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "student_id", nullable = false)
     private Student student;

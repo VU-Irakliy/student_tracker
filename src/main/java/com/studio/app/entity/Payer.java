@@ -21,10 +21,12 @@ import lombok.*;
 @Builder
 public class Payer extends BaseEntity {
 
+    /** Database identifier of the payer record. */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** Student for whom this person makes payments. */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "student_id", nullable = false)
     private Student student;

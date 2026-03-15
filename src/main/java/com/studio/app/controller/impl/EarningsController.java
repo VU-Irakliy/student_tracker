@@ -1,8 +1,8 @@
 package com.studio.app.controller.impl;
 
 import com.studio.app.controller.EarningsApi;
-import com.studio.app.dto.response.DailyEarningsResponse;
 import com.studio.app.dto.response.MonthlyEarningsResponse;
+import com.studio.app.dto.response.PeriodEarningsResponse;
 import com.studio.app.enums.Currency;
 import com.studio.app.service.EarningsService;
 import lombok.RequiredArgsConstructor;
@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.util.List;
 
 /**
  * REST controller implementation for earnings tracking.
@@ -25,9 +24,9 @@ public class EarningsController implements EarningsApi {
 
     /** {@inheritDoc} */
     @Override
-    public ResponseEntity<List<DailyEarningsResponse>> getDailyEarnings(LocalDate from,
-                                                                         LocalDate to,
-                                                                         Currency baseCurrency) {
+    public ResponseEntity<PeriodEarningsResponse> getDailyEarnings(LocalDate from,
+                                                                    LocalDate to,
+                                                                    Currency baseCurrency) {
         return ResponseEntity.ok(earningsService.getDailyEarnings(from, to, baseCurrency));
     }
 
