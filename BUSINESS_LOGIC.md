@@ -47,6 +47,9 @@ situation.
 - `PACKAGE` — deducted from a prepaid package
 - `REFUNDED` — reserved for future use
 
+**`StudentClassType`** — student's learning track:
+- `CASUAL`, `EGE`, `OGE`, `IELTS`, `TOFEL`
+
 ---
 
 ## 2. Pricing Models

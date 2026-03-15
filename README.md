@@ -85,7 +85,8 @@ src/main/java/com/studio/app/
 │   ├── ClassStatus.java                 # SCHEDULED | COMPLETED | CANCELLED | MOVED
 │   ├── PaymentStatus.java               # UNPAID | PAID | PACKAGE | REFUNDED
 │   ├── Currency.java                    # EUROS | DOLLARS | RUBLES
-│   └── StudioTimezone.java              # SPAIN | RUSSIA_MOSCOW
+│   ├── StudioTimezone.java              # SPAIN | RUSSIA_MOSCOW
+│   └── StudentClassType.java            # CASUAL | EGE | OGE | IELTS | TOFEL
 └── exception/                           # Custom exceptions + global handler
 
 src/main/resources/
@@ -97,7 +98,7 @@ db/
 │   ├── 00_create_schema.sql
 │   ├── 01_create_tables.sql
 │   ├── 02_create_indexes.sql
-│   └── 03–05_*.sql                      # additive migrations
+│   └── 03–06_*.sql                      # additive migrations
 ├── scripts/
 │   ├── backup.ps1
 │   └── restore.ps1
@@ -258,12 +259,14 @@ cached value is used as a fallback.
   "pricePerClass": 35.00,
   "currency": "EUROS",
   "timezone": "SPAIN",
+  "classType": "CASUAL",
   "notes": "Prefers morning classes"
 }
 ```
 `pricingType`: `PER_CLASS` | `PACKAGE`  
 `currency`: `EUROS` | `DOLLARS` | `RUBLES`  
 `timezone`: `SPAIN` | `RUSSIA_MOSCOW`
+`classType`: `CASUAL` | `EGE` | `OGE` | `IELTS` | `TOFEL`
 
 Student responses also include `debtor` (boolean), maintained by the debtor batch process.
 

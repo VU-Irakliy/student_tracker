@@ -48,6 +48,7 @@ Each student has a profile with:
 - **Price per class** — only if they pay per class; package students don't have a per-class price
 - **Currency** — Euros, Dollars, or Rubles
 - **Timezone** — Spain or Russia (Moscow) — used for display purposes
+- **Class type** — Casual, EGE, OGE, IELTS, or TOFEL
 - **Notes** — anything you want to remember about them
 - **Debtor flag** — automatically turns on if a lesson has happened and is still unpaid
 

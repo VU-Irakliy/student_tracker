@@ -2,6 +2,7 @@ package com.studio.app.dto.request;
 
 import com.studio.app.enums.Currency;
 import com.studio.app.enums.PricingType;
+import com.studio.app.enums.StudentClassType;
 import com.studio.app.enums.StudioTimezone;
 import jakarta.validation.constraints.DecimalMin;
 import lombok.*;
@@ -40,6 +41,9 @@ public class UpdateStudentRequest {
 
     /** Updated student timezone used for scheduling/display. */
     private StudioTimezone timezone;
+
+    /** Updated class program type for the student. */
+    private StudentClassType classType;
 
     /** Updated internal notes visible to teacher/admin. */
     private String notes;

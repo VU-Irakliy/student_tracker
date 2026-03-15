@@ -2,6 +2,7 @@ package com.studio.app.dto.response;
 
 import com.studio.app.enums.Currency;
 import com.studio.app.enums.PricingType;
+import com.studio.app.enums.StudentClassType;
 import com.studio.app.enums.StudioTimezone;
 import lombok.*;
 
@@ -52,6 +53,9 @@ public class StudentResponse {
 
     /** Timezone used for scheduling and displaying class times. */
     private StudioTimezone timezone;
+
+    /** Program type this student attends. */
+    private StudentClassType classType;
 
     /** Optional internal notes visible to teacher/admin. */
     private String notes;

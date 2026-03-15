@@ -2,6 +2,7 @@ package com.studio.app.dto.request;
 
 import com.studio.app.enums.Currency;
 import com.studio.app.enums.PricingType;
+import com.studio.app.enums.StudentClassType;
 import com.studio.app.enums.StudioTimezone;
 import jakarta.validation.constraints.*;
 import lombok.*;
@@ -48,6 +49,9 @@ public class CreateStudentRequest {
     /** Student timezone used to schedule and display class times. */
     @NotNull(message = "Timezone is required")
     private StudioTimezone timezone;
+
+    /** Program type the student attends. Defaults to {@code CASUAL} when omitted. */
+    private StudentClassType classType;
 
     /** Optional internal notes visible to teacher/admin. */
     private String notes;

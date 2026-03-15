@@ -21,12 +21,12 @@ import java.util.List;
 public interface StudentApi {
 
     /**
-     * Registers a new student with pricing type, price, and timezone.
+     * Registers a new student with pricing type, class type, price, and timezone.
      *
      * @param request the student creation details
      * @return the created {@link StudentResponse}
      */
-    @Operation(summary = "Create a student", description = "Registers a new student with pricing type, price, and timezone.")
+    @Operation(summary = "Create a student", description = "Registers a new student with pricing type, class type, price, and timezone.")
     @PostMapping
     ResponseEntity<StudentResponse> createStudent(@Valid @RequestBody CreateStudentRequest request);
 

@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS studio.students (
     price_per_class NUMERIC(10, 2),
     currency        VARCHAR(50),                           -- DOLLARS | EUROS | RUBLES
     timezone        VARCHAR(50)     NOT NULL,              -- StudioTimezone enum
+    class_type      VARCHAR(50)     NOT NULL DEFAULT 'CASUAL', -- CASUAL | EGE | OGE | IELTS | TOFEL
     notes           TEXT,
     debtor          BOOLEAN         NOT NULL DEFAULT FALSE,
     created_at      TIMESTAMP       NOT NULL DEFAULT NOW(),

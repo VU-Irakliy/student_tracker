@@ -2,6 +2,7 @@ package com.studio.app.entity;
 
 import com.studio.app.enums.Currency;
 import com.studio.app.enums.PricingType;
+import com.studio.app.enums.StudentClassType;
 import com.studio.app.enums.StudioTimezone;
 import jakarta.persistence.*;
 import lombok.*;
@@ -67,6 +68,12 @@ public class Student extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "timezone", nullable = false)
     private StudioTimezone timezone;
+
+    /** Program type this student studies (casual, exam prep, etc.). */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "class_type", nullable = false)
+    @Builder.Default
+    private StudentClassType classType = StudentClassType.CASUAL;
 
     /** Notes visible to the teacher/admin. */
     @Column(name = "notes", columnDefinition = "TEXT")
