@@ -49,9 +49,14 @@ Each student has a profile with:
 - **Currency** — Euros, Dollars, or Rubles
 - **Timezone** — Spain or Russia (Moscow) — used for display purposes
 - **Notes** — anything you want to remember about them
+- **Debtor flag** — automatically turns on if a lesson has happened and is still unpaid
 
 You can update any of this at any time. Changing the pricing type (e.g. from per-class to
 package) only affects new payments going forward — old records stay as they were.
+
+The debtor flag is not edited manually. The system updates it in batch mode:
+- after 10:00 PM in each student's local timezone, and
+- once at app startup (catch-up), so status is corrected after downtime.
 
 ---
 
@@ -103,6 +108,15 @@ If a student has an extra class that's not part of their regular schedule — fo
 a make-up lesson or a class moved from another day — you can add it as a **one-off**.
 One-off classes work exactly like regular ones but are flagged separately so you can tell
 them apart.
+
+### Updating class details in one place
+
+You can update key class information in a single action: date, time, duration, note,
+class status, and whether it is paid/unpaid.
+
+There is also a separate quick action to toggle completion state:
+- completed = class conducted
+- incompleted = back to scheduled
 
 ---
 
@@ -362,6 +376,13 @@ show — but all the original values are still there.
 
 **"I want to see what classes haven't been paid yet."**
 > Filter a student's classes by payment status "Unpaid" to see everything outstanding.
+
+**"When does someone become a debtor?"**
+> If a class has already happened and is still unpaid, the student is marked as debtor.
+> This check runs after 10:00 PM local time and also once on app startup.
+
+**"When does debtor status go back to normal?"**
+> As soon as all happened unpaid classes are paid, the next batch check switches debtor off.
 
 **"A student who pays per-class wants to switch to packages."**
 > Update their profile to change the pricing type. Old paid classes stay as they are.

@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS studio.students (
     currency        VARCHAR(50),                           -- DOLLARS | EUROS | RUBLES
     timezone        VARCHAR(50)     NOT NULL,              -- StudioTimezone enum
     notes           TEXT,
+    debtor          BOOLEAN         NOT NULL DEFAULT FALSE,
     created_at      TIMESTAMP       NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMP       NOT NULL DEFAULT NOW(),
     deleted         BOOLEAN         NOT NULL DEFAULT FALSE

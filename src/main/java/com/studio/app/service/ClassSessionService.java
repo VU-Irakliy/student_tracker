@@ -4,6 +4,7 @@ import com.studio.app.dto.request.CancelSessionRequest;
 import com.studio.app.dto.request.MovePaymentRequest;
 import com.studio.app.dto.request.OneOffSessionRequest;
 import com.studio.app.dto.request.PaySessionRequest;
+import com.studio.app.dto.request.UpdateSessionRequest;
 import com.studio.app.dto.response.CalendarDayResponse;
 import com.studio.app.dto.response.ClassSessionResponse;
 import com.studio.app.enums.PaymentStatus;
@@ -44,6 +45,15 @@ public interface ClassSessionService {
     ClassSessionResponse getSessionById(Long sessionId);
 
     /**
+     * Partially updates a session's date/time/duration/status/payment/note.
+     *
+     * @param sessionId the session ID
+     * @param request   fields to update
+     * @return the updated session
+     */
+    ClassSessionResponse updateSession(Long sessionId, UpdateSessionRequest request);
+
+    /**
      * Cancels a class session with configurable payment handling.
      *
      * @param sessionId the session ID
@@ -64,6 +74,15 @@ public interface ClassSessionService {
      * @return the updated session
      */
     ClassSessionResponse markSessionPaid(Long sessionId, PaySessionRequest request);
+
+    /**
+     * Sets session completion state.
+     *
+     * @param sessionId  the session ID
+     * @param completed  true -> COMPLETED, false -> SCHEDULED
+     * @return the updated session
+     */
+    ClassSessionResponse setSessionCompletion(Long sessionId, boolean completed);
 
     /**
      * Cancels the payment for a session, reverting it to {@code UNPAID}.

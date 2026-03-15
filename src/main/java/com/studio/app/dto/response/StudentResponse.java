@@ -37,6 +37,7 @@ public class StudentResponse {
 
     private StudioTimezone timezone;
     private String notes;
+    private boolean debtor;
     private LocalDateTime createdAt;
     private List<WeeklyScheduleResponse> weeklySchedules;
 

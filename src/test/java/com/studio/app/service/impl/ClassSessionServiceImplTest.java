@@ -4,6 +4,7 @@ import com.studio.app.dto.request.CancelSessionRequest;
 import com.studio.app.dto.request.MovePaymentRequest;
 import com.studio.app.dto.request.OneOffSessionRequest;
 import com.studio.app.dto.request.PaySessionRequest;
+import com.studio.app.dto.request.UpdateSessionRequest;
 import com.studio.app.dto.response.ClassSessionResponse;
 import com.studio.app.entity.ClassSession;
 import com.studio.app.entity.PackagePurchase;
@@ -182,6 +183,59 @@ class ClassSessionServiceImplTest {
             sessionService.getSessionsForStudent(1L, null, null);
 
             verify(sessionRepository).findByStudentIdAndDeletedFalseOrderByClassDateAscStartTimeAsc(1L);
+        }
+    }
+
+    @Nested
+    class UpdateSession {
+
+        @Test
+        void shouldUpdateDateStatusAndNoteInOneRequest() {
+            when(sessionRepository.findByIdAndDeletedFalse(10L)).thenReturn(Optional.of(session));
+            when(sessionRepository.save(any())).thenReturn(session);
+            when(sessionMapper.toResponse(session)).thenReturn(sessionResponse);
+            when(currencyConversionService.convertToAll(any(), any())).thenReturn(Collections.emptyMap());
+
+            sessionService.updateSession(10L, UpdateSessionRequest.builder()
+                    .classDate(LocalDate.of(2026, 3, 22))
+                    .status(ClassStatus.COMPLETED)
+                    .note("Conducted online")
+                    .build());
+
+            assertThat(session.getClassDate()).isEqualTo(LocalDate.of(2026, 3, 22));
+            assertThat(session.getStatus()).isEqualTo(ClassStatus.COMPLETED);
+            assertThat(session.getNote()).isEqualTo("Conducted online");
+        }
+
+        @Test
+        void shouldTogglePaymentToPaidFromUpdateEndpoint() {
+            when(sessionRepository.findByIdAndDeletedFalse(10L)).thenReturn(Optional.of(session));
+            when(sessionRepository.save(any())).thenReturn(session);
+            when(sessionMapper.toResponse(session)).thenReturn(sessionResponse);
+            when(currencyConversionService.convertToAll(any(), any())).thenReturn(Collections.emptyMap());
+
+            sessionService.updateSession(10L, UpdateSessionRequest.builder()
+                    .paid(true)
+                    .amountOverride(new BigDecimal("28.00"))
+                    .build());
+
+            assertThat(session.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
+            assertThat(session.getPriceCharged()).isEqualByComparingTo("28.00");
+        }
+
+        @Test
+        void shouldTogglePaymentToUnpaidFromUpdateEndpoint() {
+            session.setPaymentStatus(PaymentStatus.PAID);
+            when(sessionRepository.findByIdAndDeletedFalse(10L)).thenReturn(Optional.of(session));
+            when(sessionRepository.save(any())).thenReturn(session);
+            when(sessionMapper.toResponse(session)).thenReturn(sessionResponse);
+            when(currencyConversionService.convertToAll(any(), any())).thenReturn(Collections.emptyMap());
+
+            sessionService.updateSession(10L, UpdateSessionRequest.builder()
+                    .paid(false)
+                    .build());
+
+            assertThat(session.getPaymentStatus()).isEqualTo(PaymentStatus.UNPAID);
         }
     }
 
@@ -433,6 +487,35 @@ class ClassSessionServiceImplTest {
                     MovePaymentRequest.builder().targetSessionId(11L).build()))
                     .isInstanceOf(BadRequestException.class)
                     .hasMessageContaining("Target session is already paid");
+        }
+    }
+
+    @Nested
+    class CompleteSession {
+
+        @Test
+        void shouldMarkCompleted() {
+            when(sessionRepository.findByIdAndDeletedFalse(10L)).thenReturn(Optional.of(session));
+            when(sessionRepository.save(any())).thenReturn(session);
+            when(sessionMapper.toResponse(session)).thenReturn(sessionResponse);
+            when(currencyConversionService.convertToAll(any(), any())).thenReturn(Collections.emptyMap());
+
+            sessionService.setSessionCompletion(10L, true);
+
+            assertThat(session.getStatus()).isEqualTo(ClassStatus.COMPLETED);
+        }
+
+        @Test
+        void shouldMarkIncompletedToScheduled() {
+            session.setStatus(ClassStatus.COMPLETED);
+            when(sessionRepository.findByIdAndDeletedFalse(10L)).thenReturn(Optional.of(session));
+            when(sessionRepository.save(any())).thenReturn(session);
+            when(sessionMapper.toResponse(session)).thenReturn(sessionResponse);
+            when(currencyConversionService.convertToAll(any(), any())).thenReturn(Collections.emptyMap());
+
+            sessionService.setSessionCompletion(10L, false);
+
+            assertThat(session.getStatus()).isEqualTo(ClassStatus.SCHEDULED);
         }
     }
 }

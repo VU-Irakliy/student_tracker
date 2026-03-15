@@ -3,6 +3,7 @@ import com.studio.app.controller.SessionApi;
 import com.studio.app.dto.request.CancelSessionRequest;
 import com.studio.app.dto.request.MovePaymentRequest;
 import com.studio.app.dto.request.PaySessionRequest;
+import com.studio.app.dto.request.UpdateSessionRequest;
 import com.studio.app.dto.response.ClassSessionResponse;
 import com.studio.app.service.ClassSessionService;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,12 @@ public class SessionController implements SessionApi {
 
     /** {@inheritDoc} */
     @Override
+    public ResponseEntity<ClassSessionResponse> updateSession(Long sessionId, UpdateSessionRequest request) {
+        return ResponseEntity.ok(sessionService.updateSession(sessionId, request));
+    }
+
+    /** {@inheritDoc} */
+    @Override
     public ResponseEntity<ClassSessionResponse> cancelSession(Long sessionId, CancelSessionRequest request) {
         return ResponseEntity.ok(sessionService.cancelSession(sessionId, request));
     }
@@ -35,6 +42,12 @@ public class SessionController implements SessionApi {
     public ResponseEntity<ClassSessionResponse> markPaid(Long sessionId, PaySessionRequest request) {
         return ResponseEntity.ok(sessionService.markSessionPaid(sessionId,
                 request != null ? request : new PaySessionRequest()));
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public ResponseEntity<ClassSessionResponse> setCompletion(Long sessionId, boolean completed) {
+        return ResponseEntity.ok(sessionService.setSessionCompletion(sessionId, completed));
     }
 
     /** {@inheritDoc} */

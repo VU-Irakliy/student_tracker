@@ -69,6 +69,11 @@ public class Student extends BaseEntity {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
+    /** True when the student has at least one past unpaid session after nightly debtor check. */
+    @Column(name = "debtor", nullable = false)
+    @Builder.Default
+    private boolean debtor = false;
+
     /** Recurring weekly schedule entries for this student. */
     @OneToMany(mappedBy = "student", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

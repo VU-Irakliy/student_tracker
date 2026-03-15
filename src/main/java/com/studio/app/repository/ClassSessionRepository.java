@@ -78,4 +78,23 @@ public interface ClassSessionRepository extends JpaRepository<ClassSession, Long
     List<ClassSession> findPaidSessionsByDateRange(
             @Param("from") LocalDate from,
             @Param("to") LocalDate to);
+
+    /** True when student has at least one unpaid non-cancelled session that has already happened. */
+    @Query("""
+            SELECT CASE WHEN COUNT(cs) > 0 THEN true ELSE false END
+            FROM ClassSession cs
+            WHERE cs.deleted          = false
+              AND cs.student.id       = :studentId
+              AND cs.student.deleted  = false
+              AND cs.paymentStatus    = 'UNPAID'
+              AND cs.status          <> 'CANCELLED'
+              AND (
+                    cs.classDate < :localDate
+                    OR (cs.classDate = :localDate AND cs.startTime <= :localTime)
+                  )
+            """)
+    boolean existsUnpaidOccurredSessionForStudent(
+            @Param("studentId") Long studentId,
+            @Param("localDate") LocalDate localDate,
+            @Param("localTime") java.time.LocalTime localTime);
 }

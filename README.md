@@ -97,7 +97,7 @@ db/
 │   ├── 00_create_schema.sql
 │   ├── 01_create_tables.sql
 │   ├── 02_create_indexes.sql
-│   └── 03–04_*.sql                      # additive migrations
+│   └── 03–05_*.sql                      # additive migrations
 ├── scripts/
 │   ├── backup.ps1
 │   └── restore.ps1
@@ -226,8 +226,8 @@ cached value is used as a fallback.
 | POST   | `/api/students`             | Create a student                   |
 | GET    | `/api/students`             | List all; `?search=name` to filter |
 | GET    | `/api/students/{id}`        | Get one student                    |
-| POST   | `/api/students/{id}`        | Update student (partial/patch)     |
-| POST   | `/api/students/{id}/delete` | Soft-delete student + all data     |
+| PUT    | `/api/students/{id}`        | Update student (partial)           |
+| DELETE | `/api/students/{id}`        | Soft-delete student + related data |
 
 **Create / update body (all fields optional on update):**
 ```json
@@ -245,6 +245,8 @@ cached value is used as a fallback.
 `pricingType`: `PER_CLASS` | `PACKAGE`  
 `currency`: `EUROS` | `DOLLARS` | `RUBLES`  
 `timezone`: `SPAIN` | `RUSSIA_MOSCOW`
+
+Student responses also include `debtor` (boolean), maintained by the debtor batch process.
 
 ---
 
@@ -302,8 +304,10 @@ cached value is used as a fallback.
 | Method | Path                                    | Description                                                      |
 |--------|-----------------------------------------|------------------------------------------------------------------|
 | GET    | `/api/sessions/{id}`                    | Get session details                                              |
+| PUT    | `/api/sessions/{id}`                    | Update date/time/duration/status/payment/note in one request     |
 | POST   | `/api/sessions/{id}/cancel`             | Cancel session (optionally keep payment)                         |
 | POST   | `/api/sessions/{id}/pay`                | Mark as paid (auto-deducts from active package for PACKAGE type) |
+| POST   | `/api/sessions/{id}/completion`         | Set completion state via `?completed=true\|false`               |
 | POST   | `/api/sessions/{id}/cancel-payment`     | Revert payment (→ UNPAID or return slot to package)              |
 | POST   | `/api/sessions/{id}/move-payment`       | Move payment to another session                                  |
 
@@ -315,6 +319,25 @@ cached value is used as a fallback.
 **Pay (PER_CLASS with optional price override):**
 ```json
 { "amountOverride": 30.00 }
+```
+
+**Unified update (`PUT /api/sessions/{id}`):**
+```json
+{
+  "classDate": "2026-04-20",
+  "startTime": "11:00",
+  "durationMinutes": 60,
+  "status": "COMPLETED",
+  "paid": true,
+  "amountOverride": 30.00,
+  "note": "Conducted and paid"
+}
+```
+
+**Set completion state:**
+```
+POST /api/sessions/{id}/completion?completed=true
+POST /api/sessions/{id}/completion?completed=false
 ```
 
 **Move payment:**
@@ -388,13 +411,24 @@ Query parameters:
 | Pay session (PACKAGE student)           | Auto-deducts from oldest active package (FIFO); `paymentStatus=PACKAGE`                   |
 | Pay session (no active package)         | `400 Bad Request`                                                                          |
 | Pay already-paid session                | `400 Bad Request`                                                                          |
+| Set completion state                    | `/completion?completed=true\|false` switches `status` between `COMPLETED` and `SCHEDULED` |
+| Unified session update                  | `PUT /api/sessions/{id}` can update schedule fields, status, payment toggle, and note     |
 | Move payment (source must be PAID)      | Source → `UNPAID`, target → `PAID`, price transferred                                     |
 | Student soft-delete                     | Student + schedules + payers soft-deleted; only **future** sessions deleted, past kept     |
+| Debtor status                           | After 22:00 local time, students with already-happened `UNPAID` sessions are marked debtor |
+| Debtor startup catch-up                 | On app startup, debtor recomputation runs once without waiting for 22:00                   |
 | Price capture                           | `priceCharged` copied from student at session creation time                                |
 | Package FIFO deduction                  | Oldest active package (by `paymentDate`) is consumed first                                 |
 | Currency conversion unavailable         | Stale cache used if available; otherwise `convertedPrices` map is empty (no crash)         |
 
 > 📖 See [BUSINESS_LOGIC.md](./BUSINESS_LOGIC.md) for full scenario walkthroughs.
+
+### Debtor Batch Configuration
+
+- `debtor.batch.cron` (default `0 5 * * * *`) schedules periodic debtor recomputation.
+- `debtor.batch.run-on-startup` (default `true`) triggers a catch-up run at startup.
+- Scheduled runs only apply updates for students whose local time is `22:00` or later.
+- Startup catch-up ignores the 22:00 gate so statuses are corrected immediately after downtime.
 
 ---
 

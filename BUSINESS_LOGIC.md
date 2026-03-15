@@ -17,8 +17,9 @@ situation.
 7. [Payment Operations](#7-payment-operations)
 8. [Earnings Calculation](#8-earnings-calculation)
 9. [Student Deletion](#9-student-deletion)
-10. [Currency Conversion](#10-currency-conversion)
-11. [Error Reference](#11-error-reference)
+10. [Debtor Status Batch](#10-debtor-status-batch)
+11. [Currency Conversion](#11-currency-conversion)
+12. [Error Reference](#12-error-reference)
 
 ---
 
@@ -89,7 +90,12 @@ A student is assigned one of two pricing types at creation time (changeable via 
 ```
 
 Sessions are created with `status=SCHEDULED` and `paymentStatus=UNPAID`.  
-There is no automatic status transition — the teacher manually marks sessions as paid or cancelled.
+There is no automatic status transition — status/payment changes are manual.
+
+Supported manual actions:
+- `PUT /api/sessions/{id}` — unified partial update (date/time/duration/status/payment toggle/note)
+- `POST /api/sessions/{id}/completion?completed=true|false` — sets `status` to `COMPLETED` or `SCHEDULED`
+- `POST /api/sessions/{id}/pay`, `/cancel`, `/cancel-payment`, `/move-payment` remain available
 
 ---
 
@@ -402,8 +408,8 @@ This means:
 
 Deleting a student is a **soft-delete** — data is never removed from the database.
 
-```json
-POST /api/students/{id}/delete
+```
+DELETE /api/students/{id}
 ```
 
 **What gets soft-deleted:**
@@ -421,7 +427,35 @@ for auditing and financial reporting.
 
 ---
 
-## 10. Currency Conversion
+## 10. Debtor Status Batch
+
+Each student has a `debtor` flag (`true/false`) recalculated by a batch process.
+
+### 10.1 When a student becomes debtor
+
+A student is marked `debtor=true` when they have at least one session that:
+- is not soft-deleted,
+- has `paymentStatus=UNPAID`,
+- is not `status=CANCELLED`, and
+- has already happened in the student's local timezone (`classDate < localDate`, or same date with `startTime <= localTime`).
+
+This applies to both pricing models:
+- `PER_CLASS`: unpaid happened class means debt.
+- `PACKAGE`: debt exists only when the class happened but no package deduction/payment was recorded yet (`UNPAID`).
+
+### 10.2 When debtor is cleared
+
+When all qualifying unpaid happened sessions are resolved, the next recomputation sets `debtor=false`.
+
+### 10.3 Batch timing
+
+- Scheduled job runs by `debtor.batch.cron` (default hourly).
+- Scheduled run applies updates only for students whose local time is `22:00` or later.
+- Startup catch-up (`debtor.batch.run-on-startup=true`) runs once after app boot and bypasses the 22:00 gate.
+
+---
+
+## 11. Currency Conversion
 
 Every API response that includes a monetary amount (`priceCharged`, `pricePerClass`, `amountPaid`)
 also includes a `convertedPrices` / `convertedAmountPaid` map with the equivalent value in
@@ -447,7 +481,7 @@ is always present.
 
 ---
 
-## 11. Error Reference
+## 12. Error Reference
 
 | HTTP Status | When it occurs                                                              |
 |-------------|-----------------------------------------------------------------------------|
