@@ -13,11 +13,8 @@ Push-Location $projectRoot
 
 try {
     Write-Host ""
-    Write-Host "Starting PostgreSQL container..." -ForegroundColor Cyan
-    docker compose up -d postgres | Out-Null
-
-    Write-Host "Applying pending database scripts..." -ForegroundColor Cyan
-    & (Join-Path $PSScriptRoot "apply-pending-init.ps1")
+    Write-Host "Starting PostgreSQL and migration services..." -ForegroundColor Cyan
+    docker compose up -d postgres db-migrator | Out-Null
 
     Write-Host "Database is ready." -ForegroundColor Green
     Write-Host ""

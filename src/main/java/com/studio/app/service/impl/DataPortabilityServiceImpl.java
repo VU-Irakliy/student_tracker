@@ -9,6 +9,7 @@ import com.studio.app.repository.*;
 import com.studio.app.service.DataPortabilityService;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +19,7 @@ import java.util.*;
 /**
  * Default implementation for import/export snapshot operations.
  */
+@Lazy
 @Service
 @RequiredArgsConstructor
 public class DataPortabilityServiceImpl implements DataPortabilityService {

@@ -97,12 +97,13 @@ src/main/resources/
 └── logback-spring.xml                   # logging (console + Desktop error file)
 
 db/
-├── init/                                # auto-run on first Docker startup
+├── init/                                # additive SQL migrations
 │   ├── 00_create_schema.sql
 │   ├── 01_create_tables.sql
 │   ├── 02_create_indexes.sql
 │   └── 03–06_*.sql                      # additive migrations
 ├── scripts/
+│   ├── apply-pending-init.sh            # container-native auto migration runner
 │   ├── backup.ps1
 │   └── restore.ps1
 └── backups/                             # dump output directory (git-ignored)
@@ -118,17 +119,17 @@ db/
 docker compose up -d
 ```
 
-On **first startup** (empty `pgdata/`) the SQL scripts in `db/init/` automatically create
-the `studio` schema, all tables, and indexes. Data is persisted in `pgdata/` (git-ignored).
+On **first startup** (empty `pgdata/`) PostgreSQL initializes from `db/init/`.
+On every next `docker compose up -d`, the `db-migrator` service checks `db/init/*.sql`
+in filename order and applies only scripts missing from `studio.schema_migration_history`.
 
-For existing databases, run the startup helper script to automate migration checks:
+If you prefer using the helper script:
 
 ```powershell
 .\db\scripts\start-db.ps1
 ```
 
-It starts PostgreSQL, checks `studio.schema_migration_history`, runs only pending
-`db/init/*.sql` scripts in filename order, and records each applied script.
+It starts PostgreSQL plus `db-migrator`, so pending scripts are applied automatically.
 
 ```bash
 docker compose down        # stop (keeps data)
@@ -196,15 +197,11 @@ The SQL init scripts are the single source of truth.
 
 The restore runs inside a single transaction — if anything fails, nothing changes.
 
-### Apply Pending Init Scripts Manually
+### Migration Notes
 
-If you want to trigger migration checks manually:
-
-```powershell
-.\db\scripts\apply-pending-init.ps1
-```
-
-The script skips already-applied files using `studio.schema_migration_history`.
+`studio.schema_migration_history` prevents re-running the same script.
+If a previously applied file is edited, `db-migrator` logs that checksum differs and skips it,
+so the safe path is still to add changes as a new SQL file.
 
 ---
 
