@@ -408,7 +408,7 @@ Each day entry includes:
 
 | Method | Path                 | Description                                    |
 |--------|----------------------|------------------------------------------------|
-| GET    | `/api/earnings/daily`   | Per-day earnings for a date range           |
+| GET    | `/api/earnings/daily`   | Selected-period earnings + daily breakdown  |
 | GET    | `/api/earnings/monthly` | Monthly summary with optional base currency |
 
 Query parameters:
@@ -416,7 +416,16 @@ Query parameters:
 - `year`, `month` — for monthly endpoint
 - `baseCurrency` — `EUROS` | `DOLLARS` | `RUBLES` (optional; returns a normalised total)
 
-**Daily earnings** count only `PAID` (per-class) sessions.  
+`/api/earnings/daily` returns a period object with:
+- `dailyBreakdown` (per-day rows for `PAID` per-class sessions)
+- `totalEarned*` (includes paid per-class sessions + package purchases in range)
+- `totalCouldHaveEarnedExcludingCancellations*`
+- `totalCouldHaveEarnedIncludingCancellations*`
+
+Package purchases are included in period totals when `paymentDate` is inside `from..to`.
+
+To get **weekly earnings**, call `/api/earnings/daily` with any 7-day range.
+
 **Monthly earnings** include both per-class session payments **and** package purchase payments
 (matched by `paymentDate` within the month).
 

@@ -287,13 +287,19 @@ calculated.
 
 The app can show you how much money you've earned.
 
-### Daily view
+### Daily view (selected period)
 
-Shows earnings **day by day** for a date range you choose.
+Shows a selected period (for example, a week) with:
 
-- Only counts classes that were paid **individually** (Paid status)
-- Package classes are **not counted here** — the money for those was counted when
-  the package was purchased, not when each class was used
+- **Daily breakdown** day by day (only individually paid classes, status = Paid)
+- **Total earned** for the whole selected period
+- **Total could have earned (excluding cancellations)**
+- **Total could have earned (including cancellations)**
+
+Package classes are still not counted in each day row. But package **purchases** are
+included in period totals when their payment date is inside the selected date range.
+
+If you want a weekly report, just request a 7-day range.
 
 ### Monthly view
 

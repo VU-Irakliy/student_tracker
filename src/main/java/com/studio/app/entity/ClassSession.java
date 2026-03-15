@@ -39,10 +39,12 @@ import java.time.LocalTime;
 @Builder
 public class ClassSession extends BaseEntity {
 
+    /** Database identifier of the concrete class session. */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** Student who attends this class session. */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "student_id", nullable = false)
     private Student student;
@@ -67,11 +69,13 @@ public class ClassSession extends BaseEntity {
     @Column(name = "duration_minutes", nullable = false)
     private Integer durationMinutes;
 
+    /** Operational state of the class (scheduled, completed, cancelled, etc.). */
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     @Builder.Default
     private ClassStatus status = ClassStatus.SCHEDULED;
 
+    /** How this session is paid (unpaid, paid, or deducted from package). */
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_status", nullable = false)
     @Builder.Default

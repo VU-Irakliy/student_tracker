@@ -20,10 +20,12 @@ import java.time.LocalDate;
 @Builder
 public class PackagePurchaseRequest {
 
+    /** Number of classes included in the purchased package. */
     @NotNull(message = "Total classes is required")
     @Min(value = 1, message = "Package must include at least 1 class")
     private Integer totalClasses;
 
+    /** Actual amount received for the package. */
     @NotNull(message = "Amount paid is required")
     @DecimalMin(value = "0.00", message = "Amount paid cannot be negative")
     private BigDecimal amountPaid;
@@ -31,8 +33,10 @@ public class PackagePurchaseRequest {
     /** Optional currency override. Defaults to the student's currency if not provided. */
     private Currency currency;
 
+    /** Date the package payment was received. */
     @NotNull(message = "Payment date is required")
     private LocalDate paymentDate;
 
+    /** Optional free-form label for this package purchase. */
     private String description;
 }

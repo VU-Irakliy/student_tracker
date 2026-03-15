@@ -1,8 +1,8 @@
 package com.studio.app.controller;
 
 import com.studio.app.constant.ApiConstants;
-import com.studio.app.dto.response.DailyEarningsResponse;
 import com.studio.app.dto.response.MonthlyEarningsResponse;
+import com.studio.app.dto.response.PeriodEarningsResponse;
 import com.studio.app.enums.Currency;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -13,31 +13,43 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.time.LocalDate;
-import java.util.List;
 
 /**
  * REST API contract for earnings tracking.
- * Provides endpoints to view daily and monthly earnings from per-class payments.
- * Package-covered sessions are excluded from all earnings calculations.
+ * Provides endpoints to view selected-period and monthly earnings.
+ * Daily breakdown entries include paid per-class sessions only,
+ * while period totals and monthly totals include package purchases
+ * whose payment date is in range.
+ *
+ * <p>Weekly earnings can be derived without a dedicated endpoint by calling
+ * {@code /daily} with a 7-day {@code from}/{@code to} window and reading
+ * the period totals from the response.
  */
-@Tag(name = "Earnings", description = "Daily and monthly earnings tracking (per-class payments only)")
+@Tag(name = "Earnings", description = "Selected-period and monthly earnings tracking")
 @RequestMapping(ApiConstants.EARNINGS)
 public interface EarningsApi {
 
     /**
-     * Returns daily earnings summaries for the given date range.
+     * Returns earnings for the selected date range.
      *
      * @param from         start date (inclusive)
      * @param to           end date (inclusive)
      * @param baseCurrency optional currency to normalise all totals into
-     * @return list of daily earnings (one entry per day with at least one paid session)
+     * @return period response with daily breakdown plus range totals:
+     * total earned, total potential excluding cancellations,
+     * and total potential including cancellations
      */
     @Operation(summary = "Get daily earnings",
             description = "Returns daily earnings for the given date range. "
-                    + "Only per-class (PAID) sessions are included — package payments are excluded. "
-                    + "Optionally specify a baseCurrency to get a single normalised total.")
+                    + "Includes daily earned breakdown (PAID per-class sessions), "
+                    + "period total earned, period potential excluding cancellations, "
+                    + "and period potential including cancellations. "
+                    + "Package purchases are included in period totals when package paymentDate "
+                    + "is inside the selected range. "
+                    + "Use any 7-day window to get weekly earnings without backend changes. "
+                    + "Optionally specify a baseCurrency to get normalised totals.")
     @GetMapping("/daily")
-    ResponseEntity<List<DailyEarningsResponse>> getDailyEarnings(
+    ResponseEntity<PeriodEarningsResponse> getDailyEarnings(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) Currency baseCurrency);

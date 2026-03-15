@@ -384,10 +384,24 @@ POST /api/sessions/{sourceId}/move-payment
 
 ### Daily earnings (`GET /api/earnings/daily`)
 
-- Only counts sessions with `paymentStatus=PAID` (per-class payments)
-- Package-covered sessions (`paymentStatus=PACKAGE`) are **excluded**
-- Results are grouped by date; each day shows earnings broken down by currency
-- `baseCurrency` param converts all currency subtotals into one normalised total
+- Returns a **period response** with:
+  - `dailyBreakdown` (grouped by date)
+  - `totalEarned*`
+  - `totalCouldHaveEarnedExcludingCancellations*`
+  - `totalCouldHaveEarnedIncludingCancellations*`
+- `dailyBreakdown` counts only sessions with `paymentStatus=PAID` (per-class payments)
+- Package-covered sessions (`paymentStatus=PACKAGE`) are excluded from daily rows
+- Package purchases are included in period totals when `paymentDate` is within `from..to`
+- `baseCurrency` converts per-currency totals into one normalised total
+
+Potential totals are computed as:
+
+| Total | Included per-class sessions | Packages |
+|-------|-----------------------------|----------|
+| `totalCouldHaveEarnedExcludingCancellations*` | `PAID` + `UNPAID`, excluding `status=CANCELLED` | Included by `paymentDate` |
+| `totalCouldHaveEarnedIncludingCancellations*` | `PAID` + `UNPAID`, including cancelled sessions | Included by `paymentDate` |
+
+> Weekly earnings are obtained by calling this endpoint with a 7-day range.
 
 ### Monthly earnings (`GET /api/earnings/monthly`)
 

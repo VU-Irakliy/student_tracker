@@ -20,9 +20,13 @@ import java.time.LocalTime;
 @Builder
 public class UpdateSessionRequest {
 
+    /** Updated class date in the student's timezone, if changing it. */
     private LocalDate classDate;
+
+    /** Updated start time in the student's timezone, if changing it. */
     private LocalTime startTime;
 
+    /** Updated duration in minutes. */
     @Min(value = 15, message = "Duration must be at least 15 minutes")
     @Max(value = 480, message = "Duration cannot exceed 480 minutes")
     private Integer durationMinutes;
@@ -40,6 +44,7 @@ public class UpdateSessionRequest {
     @Positive(message = "Override amount must be positive")
     private BigDecimal amountOverride;
 
+    /** Optional note attached to the session. */
     private String note;
 }
 

@@ -25,10 +25,12 @@ import java.time.LocalTime;
 @Builder
 public class WeeklySchedule extends BaseEntity {
 
+    /** Database identifier of the recurring schedule entry. */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** Student that owns this recurring schedule slot. */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "student_id", nullable = false)
     private Student student;

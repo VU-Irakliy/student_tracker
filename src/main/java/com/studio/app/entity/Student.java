@@ -29,17 +29,20 @@ import java.util.List;
 @Builder
 public class Student extends BaseEntity {
 
+    /** Database identifier of the student. */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** Student first name. */
     @Column(name = "first_name", nullable = false)
     private String firstName;
 
+    /** Student last name. */
     @Column(name = "last_name", nullable = false)
     private String lastName;
 
-
+    /** Optional contact phone number for the student or family. */
     @Column(name = "phone_number")
     private String phoneNumber;
 

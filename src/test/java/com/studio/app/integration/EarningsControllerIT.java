@@ -21,14 +21,19 @@ class EarningsControllerIT extends BaseIntegrationTest {
                             .param("from", "2026-03-01")
                             .param("to", "2026-03-31"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(3)))
-                    .andExpect(jsonPath("$[0].date").value("2026-03-02"))
-                    .andExpect(jsonPath("$[0].sessionCount").value(1))
-                    .andExpect(jsonPath("$[0].earningsByCurrency.EUROS").value(30.00))
-                    .andExpect(jsonPath("$[1].date").value("2026-03-05"))
-                    .andExpect(jsonPath("$[1].earningsByCurrency.DOLLARS").value(40.00))
-                    .andExpect(jsonPath("$[2].date").value("2026-03-10"))
-                    .andExpect(jsonPath("$[2].earningsByCurrency.DOLLARS").value(40.00));
+                    .andExpect(jsonPath("$.from").value("2026-03-01"))
+                    .andExpect(jsonPath("$.to").value("2026-03-31"))
+                    .andExpect(jsonPath("$.dailyBreakdown", hasSize(3)))
+                    .andExpect(jsonPath("$.dailyBreakdown[0].date").value("2026-03-02"))
+                    .andExpect(jsonPath("$.dailyBreakdown[0].sessionCount").value(1))
+                    .andExpect(jsonPath("$.dailyBreakdown[0].earningsByCurrency.EUROS").value(30.00))
+                    .andExpect(jsonPath("$.dailyBreakdown[1].date").value("2026-03-05"))
+                    .andExpect(jsonPath("$.dailyBreakdown[1].earningsByCurrency.DOLLARS").value(40.00))
+                    .andExpect(jsonPath("$.dailyBreakdown[2].date").value("2026-03-10"))
+                    .andExpect(jsonPath("$.dailyBreakdown[2].earningsByCurrency.DOLLARS").value(40.00))
+                    .andExpect(jsonPath("$.totalEarnedByCurrency.EUROS").value(30.00))
+                    .andExpect(jsonPath("$.totalEarnedByCurrency.DOLLARS").value(80.00))
+                    .andExpect(jsonPath("$.totalEarnedByCurrency.RUBLES").value(15000.00));
         }
 
         @Test
@@ -38,8 +43,10 @@ class EarningsControllerIT extends BaseIntegrationTest {
                             .param("to", "2026-03-31")
                             .param("baseCurrency", "EUROS"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$[0].baseCurrency").value("EUROS"))
-                    .andExpect(jsonPath("$[0].totalInBaseCurrency").isNumber());
+                    .andExpect(jsonPath("$.baseCurrency").value("EUROS"))
+                    .andExpect(jsonPath("$.totalEarnedInBaseCurrency").isNumber())
+                    .andExpect(jsonPath("$.totalCouldHaveEarnedExcludingCancellationsInBaseCurrency").isNumber())
+                    .andExpect(jsonPath("$.totalCouldHaveEarnedIncludingCancellationsInBaseCurrency").isNumber());
         }
 
         @Test
@@ -48,7 +55,10 @@ class EarningsControllerIT extends BaseIntegrationTest {
                             .param("from", "2026-06-01")
                             .param("to", "2026-06-30"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(0)));
+                    .andExpect(jsonPath("$.dailyBreakdown", hasSize(0)))
+                    .andExpect(jsonPath("$.totalEarnedByCurrency").isMap())
+                    .andExpect(jsonPath("$.totalCouldHaveEarnedExcludingCancellationsByCurrency").isMap())
+                    .andExpect(jsonPath("$.totalCouldHaveEarnedIncludingCancellationsByCurrency").isMap());
         }
 
         @Test
@@ -57,10 +67,13 @@ class EarningsControllerIT extends BaseIntegrationTest {
                             .param("from", "2026-03-02")
                             .param("to", "2026-03-02"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(1)))
-                    .andExpect(jsonPath("$[0].convertedTotals.EUROS").isNumber())
-                    .andExpect(jsonPath("$[0].convertedTotals.DOLLARS").isNumber())
-                    .andExpect(jsonPath("$[0].convertedTotals.RUBLES").isNumber());
+                    .andExpect(jsonPath("$.dailyBreakdown", hasSize(1)))
+                    .andExpect(jsonPath("$.dailyBreakdown[0].convertedTotals.EUROS").isNumber())
+                    .andExpect(jsonPath("$.dailyBreakdown[0].convertedTotals.DOLLARS").isNumber())
+                    .andExpect(jsonPath("$.dailyBreakdown[0].convertedTotals.RUBLES").isNumber())
+                    .andExpect(jsonPath("$.convertedTotalEarned.EUROS").isNumber())
+                    .andExpect(jsonPath("$.convertedTotalCouldHaveEarnedExcludingCancellations.EUROS").isNumber())
+                    .andExpect(jsonPath("$.convertedTotalCouldHaveEarnedIncludingCancellations.EUROS").isNumber());
         }
     }
 
