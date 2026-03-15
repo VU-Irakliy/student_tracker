@@ -23,6 +23,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -210,6 +212,13 @@ public class ClassSessionServiceImpl implements ClassSessionService {
                 .sorted(java.util.Map.Entry.comparingByKey())
                 .map(entry -> CalendarDayResponse.builder()
                         .date(entry.getKey())
+                        .totalHours(toHours(entry.getValue().stream()
+                                .mapToInt(ClassSession::getDurationMinutes)
+                                .sum()))
+                        .completedHours(toHours(entry.getValue().stream()
+                                .filter(session -> session.getStatus() == ClassStatus.COMPLETED)
+                                .mapToInt(ClassSession::getDurationMinutes)
+                                .sum()))
                         .sessions(sessionMapper.toResponseList(entry.getValue()).stream()
                                 .map(this::enrichWithConvertedPrices).toList())
                         .build())
@@ -229,6 +238,11 @@ public class ClassSessionServiceImpl implements ClassSessionService {
                             response.getPriceCharged(), response.getCurrency()));
         }
         return response;
+    }
+
+    private BigDecimal toHours(int minutes) {
+        return BigDecimal.valueOf(minutes)
+                .divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
     }
 
     private ClassSession findActiveSession(Long id) {

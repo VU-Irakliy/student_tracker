@@ -187,6 +187,62 @@ class ClassSessionServiceImplTest {
     }
 
     @Nested
+    class GetCalendar {
+
+        @Test
+        void shouldCalculateTotalAndCompletedHoursPerDay() {
+            var day1Completed = ClassSession.builder()
+                    .id(100L).student(perClassStudent)
+                    .classDate(LocalDate.of(2026, 3, 20))
+                    .startTime(LocalTime.of(9, 0))
+                    .durationMinutes(90)
+                    .status(ClassStatus.COMPLETED)
+                    .build();
+
+            var day1Scheduled = ClassSession.builder()
+                    .id(101L).student(perClassStudent)
+                    .classDate(LocalDate.of(2026, 3, 20))
+                    .startTime(LocalTime.of(11, 0))
+                    .durationMinutes(30)
+                    .status(ClassStatus.SCHEDULED)
+                    .build();
+
+            var day2Completed = ClassSession.builder()
+                    .id(102L).student(perClassStudent)
+                    .classDate(LocalDate.of(2026, 3, 21))
+                    .startTime(LocalTime.of(10, 0))
+                    .durationMinutes(60)
+                    .status(ClassStatus.COMPLETED)
+                    .build();
+
+            when(sessionRepository.findCalendarSessions(LocalDate.of(2026, 3, 20), LocalDate.of(2026, 3, 21)))
+                    .thenReturn(List.of(day1Completed, day1Scheduled, day2Completed));
+
+            when(sessionMapper.toResponseList(anyList())).thenAnswer(invocation -> {
+                @SuppressWarnings("unchecked")
+                var entities = (List<ClassSession>) invocation.getArgument(0);
+                return entities.stream().map(entity -> ClassSessionResponse.builder()
+                        .id(entity.getId())
+                        .classDate(entity.getClassDate())
+                        .startTime(entity.getStartTime())
+                        .durationMinutes(entity.getDurationMinutes())
+                        .status(entity.getStatus())
+                        .build()).toList();
+            });
+
+            var result = sessionService.getCalendar(LocalDate.of(2026, 3, 20), LocalDate.of(2026, 3, 21));
+
+            assertThat(result).hasSize(2);
+            assertThat(result.get(0).getDate()).isEqualTo(LocalDate.of(2026, 3, 20));
+            assertThat(result.get(0).getTotalHours()).isEqualByComparingTo("2.00");
+            assertThat(result.get(0).getCompletedHours()).isEqualByComparingTo("1.50");
+            assertThat(result.get(1).getDate()).isEqualTo(LocalDate.of(2026, 3, 21));
+            assertThat(result.get(1).getTotalHours()).isEqualByComparingTo("1.00");
+            assertThat(result.get(1).getCompletedHours()).isEqualByComparingTo("1.00");
+        }
+    }
+
+    @Nested
     class UpdateSession {
 
         @Test

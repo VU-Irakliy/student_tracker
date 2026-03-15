@@ -117,6 +117,15 @@ docker compose up -d
 On **first startup** (empty `pgdata/`) the SQL scripts in `db/init/` automatically create
 the `studio` schema, all tables, and indexes. Data is persisted in `pgdata/` (git-ignored).
 
+For existing databases, run the startup helper script to automate migration checks:
+
+```powershell
+.\db\scripts\start-db.ps1
+```
+
+It starts PostgreSQL, checks `studio.schema_migration_history`, runs only pending
+`db/init/*.sql` scripts in filename order, and records each applied script.
+
 ```bash
 docker compose down        # stop (keeps data)
 docker compose down -v     # stop + remove volume
@@ -182,6 +191,16 @@ The SQL init scripts are the single source of truth.
 ```
 
 The restore runs inside a single transaction — if anything fails, nothing changes.
+
+### Apply Pending Init Scripts Manually
+
+If you want to trigger migration checks manually:
+
+```powershell
+.\db\scripts\apply-pending-init.ps1
+```
+
+The script skips already-applied files using `studio.schema_migration_history`.
 
 ---
 
@@ -378,6 +397,10 @@ POST /api/sessions/{id}/completion?completed=false
 | GET    | `/api/calendar` | All sessions grouped by day; `?from=&to=` date filter |
 
 Defaults to today → next 30 days if dates are omitted.
+
+Each day entry includes:
+- `totalHours` — total class duration for that day
+- `completedHours` — duration for sessions with `status=COMPLETED`
 
 ---
 
