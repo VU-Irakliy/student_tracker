@@ -8,6 +8,7 @@ import jakarta.validation.constraints.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 /**
  * Request body for creating a new student.
@@ -52,6 +53,21 @@ public class CreateStudentRequest {
 
     /** Program type the student attends. Defaults to {@code CASUAL} when omitted. */
     private StudentClassType classType;
+
+    /** First date when classes are allowed for this student. */
+    private LocalDate startDate;
+
+    /** True if the student is currently on holiday. Requires {@code holidayFrom}. */
+    private Boolean holidayMode;
+
+    /** Holiday start date (inclusive) when {@code holidayMode=true}. */
+    private LocalDate holidayFrom;
+
+    /** Return date when the student is back from holiday. */
+    private LocalDate holidayTo;
+
+    /** True when the student stopped attending but should remain visible in the list. */
+    private Boolean stoppedAttending;
 
     /** Optional internal notes visible to teacher/admin. */
     private String notes;

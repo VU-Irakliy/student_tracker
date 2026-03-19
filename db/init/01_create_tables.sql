@@ -19,6 +19,11 @@ CREATE TABLE IF NOT EXISTS studio.students (
     currency        VARCHAR(50),                           -- DOLLARS | EUROS | RUBLES
     timezone        VARCHAR(50)     NOT NULL,              -- StudioTimezone enum
     class_type      VARCHAR(50)     NOT NULL DEFAULT 'CASUAL', -- CASUAL | EGE | OGE | IELTS | TOFEL
+    start_date      DATE,
+    holiday_mode    BOOLEAN         NOT NULL DEFAULT FALSE,
+    holiday_from    DATE,
+    holiday_to      DATE,
+    stopped_attending BOOLEAN       NOT NULL DEFAULT FALSE,
     notes           TEXT,
     debtor          BOOLEAN         NOT NULL DEFAULT FALSE,
     created_at      TIMESTAMP       NOT NULL DEFAULT NOW(),
@@ -66,6 +71,7 @@ CREATE TABLE IF NOT EXISTS studio.class_sessions (
     weekly_schedule_id  BIGINT          REFERENCES studio.weekly_schedules(id),
     class_date          DATE            NOT NULL,
     start_time          TIME            NOT NULL,
+    timezone            VARCHAR(50)     NOT NULL,
     duration_minutes    INTEGER         NOT NULL,
     status              VARCHAR(50)     NOT NULL DEFAULT 'SCHEDULED',  -- SCHEDULED | COMPLETED | CANCELLED | MOVED
     payment_status      VARCHAR(50)     NOT NULL DEFAULT 'UNPAID',     -- UNPAID | PAID | PACKAGE | REFUNDED

@@ -11,6 +11,7 @@ import com.studio.app.enums.Currency;
 import com.studio.app.enums.PricingType;
 import com.studio.app.enums.StudentClassType;
 import com.studio.app.enums.StudioTimezone;
+import com.studio.app.exception.BadRequestException;
 import com.studio.app.exception.ResourceNotFoundException;
 import com.studio.app.mapper.StudentMapper;
 import com.studio.app.repository.ClassSessionRepository;
@@ -166,6 +167,21 @@ class StudentServiceImplTest {
 
             assertThat(result.getConvertedPrices()).isNull();
         }
+
+        @Test
+        void shouldRejectHolidayModeWithoutHolidayFrom() {
+            var request = CreateStudentRequest.builder()
+                    .firstName("Ana")
+                    .lastName("Holiday")
+                    .pricingType(PricingType.PER_CLASS)
+                    .timezone(StudioTimezone.SPAIN)
+                    .holidayMode(true)
+                    .build();
+
+            assertThatThrownBy(() -> studentService.createStudent(request))
+                    .isInstanceOf(BadRequestException.class)
+                    .hasMessageContaining("holidayFrom");
+        }
     }
 
     @Nested
@@ -318,6 +334,67 @@ class StudentServiceImplTest {
                     .classType(StudentClassType.IELTS).build());
 
             assertThat(activeStudent.getClassType()).isEqualTo(StudentClassType.IELTS);
+        }
+
+        @Test
+        void shouldEnableHolidayModeAndCancelFutureSessions() {
+            var futureSession = ClassSession.builder()
+                    .id(12L).student(activeStudent)
+                    .classDate(LocalDate.of(2026, 3, 20))
+                    .startTime(LocalTime.of(10, 0))
+                    .durationMinutes(60)
+                    .build();
+
+            when(studentRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(activeStudent));
+            when(classSessionRepository.findByStudentIdAndDeletedFalseOrderByClassDateAscStartTimeAsc(1L))
+                    .thenReturn(List.of(futureSession));
+            when(studentRepository.save(any())).thenReturn(activeStudent);
+            when(studentMapper.toResponse(activeStudent)).thenReturn(StudentResponse.builder().build());
+
+            studentService.updateStudent(1L, UpdateStudentRequest.builder()
+                    .holidayMode(true)
+                    .holidayFrom(LocalDate.of(2026, 3, 15))
+                    .build());
+
+            assertThat(activeStudent.isHolidayMode()).isTrue();
+            assertThat(futureSession.getStatus().name()).isEqualTo("CANCELLED");
+        }
+
+        @Test
+        void shouldUpdateStoppedAttendingFlag() {
+            var pastSession = ClassSession.builder()
+                    .id(20L).student(activeStudent)
+                    .classDate(LocalDate.now().minusDays(1))
+                    .startTime(LocalTime.of(10, 0))
+                    .durationMinutes(60)
+                    .build();
+            var todaySession = ClassSession.builder()
+                    .id(21L).student(activeStudent)
+                    .classDate(LocalDate.now())
+                    .startTime(LocalTime.of(11, 0))
+                    .durationMinutes(60)
+                    .build();
+            var futureSession = ClassSession.builder()
+                    .id(22L).student(activeStudent)
+                    .classDate(LocalDate.now().plusDays(5))
+                    .startTime(LocalTime.of(12, 0))
+                    .durationMinutes(60)
+                    .build();
+
+            when(studentRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(activeStudent));
+            when(classSessionRepository.findByStudentIdAndDeletedFalseOrderByClassDateAscStartTimeAsc(1L))
+                    .thenReturn(List.of(pastSession, todaySession, futureSession));
+            when(studentRepository.save(any())).thenReturn(activeStudent);
+            when(studentMapper.toResponse(activeStudent)).thenReturn(StudentResponse.builder().build());
+
+            studentService.updateStudent(1L, UpdateStudentRequest.builder()
+                    .stoppedAttending(true)
+                    .build());
+
+            assertThat(activeStudent.isStoppedAttending()).isTrue();
+            assertThat(pastSession.isDeleted()).isFalse();
+            assertThat(todaySession.isDeleted()).isTrue();
+            assertThat(futureSession.isDeleted()).isTrue();
         }
 
         @Test

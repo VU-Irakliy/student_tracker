@@ -26,7 +26,7 @@ public class DataSnapshotResponse {
 
     /** Schema version marker for future compatibility checks. */
     @Builder.Default
-    private String snapshotVersion = "1";
+    private String snapshotVersion = "2";
 
     /** Student records. */
     @Builder.Default
@@ -63,6 +63,11 @@ public class DataSnapshotResponse {
         private Currency currency;
         private StudioTimezone timezone;
         private StudentClassType classType;
+        private LocalDate startDate;
+        private boolean holidayMode;
+        private LocalDate holidayFrom;
+        private LocalDate holidayTo;
+        private boolean stoppedAttending;
         private String notes;
         private boolean debtor;
         private boolean deleted;
@@ -111,6 +116,7 @@ public class DataSnapshotResponse {
         private Long weeklyScheduleId;
         private LocalDate classDate;
         private LocalTime startTime;
+        private StudioTimezone timezone;
         private Integer durationMinutes;
         private ClassStatus status;
         private PaymentStatus paymentStatus;

@@ -6,6 +6,7 @@ import com.studio.app.dto.request.MovePaymentRequest;
 import com.studio.app.dto.request.PaySessionRequest;
 import com.studio.app.dto.request.UpdateSessionRequest;
 import com.studio.app.dto.response.ClassSessionResponse;
+import com.studio.app.enums.StudioTimezone;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -28,7 +29,8 @@ public interface SessionApi {
      */
     @Operation(summary = "Get a session by ID", description = "Returns a single class session.")
     @GetMapping("/{sessionId}")
-    ResponseEntity<ClassSessionResponse> getSessionById(@PathVariable Long sessionId);
+    ResponseEntity<ClassSessionResponse> getSessionById(@PathVariable Long sessionId,
+                                                        @RequestParam(defaultValue = "SPAIN") StudioTimezone timezone);
 
     /**
      * Partially updates a session in one request (date/time/duration/status/payment/note).
@@ -42,7 +44,8 @@ public interface SessionApi {
             description = "Partially updates session data (date, time, duration, status, paid flag, note) in a single endpoint.")
     @PutMapping("/{sessionId}")
     ResponseEntity<ClassSessionResponse> updateSession(@PathVariable Long sessionId,
-                                                       @Valid @RequestBody UpdateSessionRequest request);
+                                                       @Valid @RequestBody UpdateSessionRequest request,
+                                                       @RequestParam(defaultValue = "SPAIN") StudioTimezone timezone);
 
     /**
      * Cancels a class session. Use {@code keepAsPaid} to retain payment or let it revert to unpaid.
@@ -54,7 +57,8 @@ public interface SessionApi {
     @Operation(summary = "Cancel a session", description = "Cancels a class session. Use 'keepAsPaid' to retain payment or let it revert to unpaid.")
     @PostMapping("/{sessionId}/cancel")
     ResponseEntity<ClassSessionResponse> cancelSession(@PathVariable Long sessionId,
-                                                       @Valid @RequestBody CancelSessionRequest request);
+                                                       @Valid @RequestBody CancelSessionRequest request,
+                                                       @RequestParam(defaultValue = "SPAIN") StudioTimezone timezone);
 
     /**
      * Marks a session as paid. For PER_CLASS students the session is marked as PAID
@@ -70,7 +74,8 @@ public interface SessionApi {
                     + "PACKAGE students: auto-deducts from the oldest active package (FIFO).")
     @PostMapping("/{sessionId}/pay")
     ResponseEntity<ClassSessionResponse> markPaid(@PathVariable Long sessionId,
-                                                  @RequestBody(required = false) PaySessionRequest request);
+                                                  @RequestBody(required = false) PaySessionRequest request,
+                                                  @RequestParam(defaultValue = "SPAIN") StudioTimezone timezone);
 
     /**
      * Sets session completion state.
@@ -82,7 +87,8 @@ public interface SessionApi {
     @Operation(summary = "Set session completion", description = "Sets session status to COMPLETED when completed=true, otherwise SCHEDULED.")
     @PostMapping("/{sessionId}/completion")
     ResponseEntity<ClassSessionResponse> setCompletion(@PathVariable Long sessionId,
-                                                       @RequestParam boolean completed);
+                                                       @RequestParam boolean completed,
+                                                       @RequestParam(defaultValue = "SPAIN") StudioTimezone timezone);
 
     /**
      * Reverts a session to UNPAID. For package sessions, the class is returned to the package.
@@ -92,7 +98,8 @@ public interface SessionApi {
      */
     @Operation(summary = "Cancel a payment", description = "Reverts a session to UNPAID. For package sessions, the class is returned to the package.")
     @PostMapping("/{sessionId}/cancel-payment")
-    ResponseEntity<ClassSessionResponse> cancelPayment(@PathVariable Long sessionId);
+    ResponseEntity<ClassSessionResponse> cancelPayment(@PathVariable Long sessionId,
+                                                       @RequestParam(defaultValue = "SPAIN") StudioTimezone timezone);
 
     /**
      * Transfers payment from this session (must be PAID) to another session.
@@ -104,5 +111,6 @@ public interface SessionApi {
     @Operation(summary = "Move a payment", description = "Transfers payment from this session (must be PAID) to another session.")
     @PostMapping("/{sessionId}/move-payment")
     ResponseEntity<ClassSessionResponse> movePayment(@PathVariable Long sessionId,
-                                                     @Valid @RequestBody MovePaymentRequest request);
+                                                     @Valid @RequestBody MovePaymentRequest request,
+                                                     @RequestParam(defaultValue = "SPAIN") StudioTimezone timezone);
 }

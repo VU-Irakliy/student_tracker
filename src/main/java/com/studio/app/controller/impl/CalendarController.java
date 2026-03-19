@@ -1,6 +1,7 @@
 package com.studio.app.controller.impl;
 import com.studio.app.controller.CalendarApi;
 import com.studio.app.dto.response.CalendarDayResponse;
+import com.studio.app.enums.StudioTimezone;
 import com.studio.app.service.ClassSessionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -19,9 +20,10 @@ public class CalendarController implements CalendarApi {
 
     /** {@inheritDoc} */
     @Override
-    public ResponseEntity<List<CalendarDayResponse>> getCalendar(LocalDate from, LocalDate to) {
+    public ResponseEntity<List<CalendarDayResponse>> getCalendar(LocalDate from, LocalDate to,
+                                                                 StudioTimezone timezone) {
         var start = from != null ? from : LocalDate.now();
         var end   = to   != null ? to   : start.plusDays(30);
-        return ResponseEntity.ok(sessionService.getCalendar(start, end));
+        return ResponseEntity.ok(sessionService.getCalendar(start, end, timezone));
     }
 }

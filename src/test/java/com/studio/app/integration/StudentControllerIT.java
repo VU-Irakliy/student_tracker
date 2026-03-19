@@ -100,14 +100,34 @@ class StudentControllerIT extends BaseIntegrationTest {
                                       "pricePerClass": 50.00,
                                       "currency": "DOLLARS",
                                       "timezone": "SPAIN",
-                                      "classType": "TOFEL"
+                                      "classType": "TOFEL",
+                                      "startDate": "2026-03-01",
+                                      "stoppedAttending": false
                                     }
                                     """))
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.firstName").value("New"))
                     .andExpect(jsonPath("$.classType").value("TOFEL"))
+                    .andExpect(jsonPath("$.startDate").value("2026-03-01"))
                     .andExpect(jsonPath("$.currency").value("DOLLARS"))
                     .andExpect(jsonPath("$.convertedPrices").isMap());
+        }
+
+        @Test
+        void shouldReturn400_whenHolidayModeWithoutHolidayFrom() throws Exception {
+            mockMvc.perform(post("/api/students")
+                            .contentType(JSON)
+                            .content("""
+                                    {
+                                      "firstName": "X",
+                                      "lastName": "Y",
+                                      "pricingType": "PER_CLASS",
+                                      "timezone": "SPAIN",
+                                      "holidayMode": true
+                                    }
+                                    """))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message", containsString("holidayFrom")));
         }
 
         @Test

@@ -38,7 +38,7 @@ class DataPortabilityControllerIT extends BaseIntegrationTest {
                 .andReturn();
 
         var root = objectMapper.readTree(gunzip(result.getResponse().getContentAsByteArray()));
-        assertThat(root.path("snapshotVersion").asText()).isEqualTo("1");
+        assertThat(root.path("snapshotVersion").asText()).isEqualTo("2");
         assertThat(root.path("students")).hasSize(4);
         assertThat(root.path("weeklySchedules")).hasSize(3);
         assertThat(root.path("packagePurchases")).hasSize(2);

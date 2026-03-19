@@ -8,6 +8,7 @@ import com.studio.app.dto.request.UpdateSessionRequest;
 import com.studio.app.dto.response.CalendarDayResponse;
 import com.studio.app.dto.response.ClassSessionResponse;
 import com.studio.app.enums.PaymentStatus;
+import com.studio.app.enums.StudioTimezone;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -24,7 +25,11 @@ public interface ClassSessionService {
      * @param request   session details
      * @return the created session
      */
-    ClassSessionResponse createOneOffSession(Long studentId, OneOffSessionRequest request);
+    default ClassSessionResponse createOneOffSession(Long studentId, OneOffSessionRequest request) {
+        return createOneOffSession(studentId, request, StudioTimezone.SPAIN);
+    }
+
+    ClassSessionResponse createOneOffSession(Long studentId, OneOffSessionRequest request, StudioTimezone viewerTimezone);
 
     /**
      * Returns all active sessions for a student, optionally filtered by date range.
@@ -34,7 +39,11 @@ public interface ClassSessionService {
      * @param to        optional end date (inclusive)
      * @return list of sessions ordered by date/time
      */
-    List<ClassSessionResponse> getSessionsForStudent(Long studentId, LocalDate from, LocalDate to);
+    default List<ClassSessionResponse> getSessionsForStudent(Long studentId, LocalDate from, LocalDate to) {
+        return getSessionsForStudent(studentId, from, to, StudioTimezone.SPAIN);
+    }
+
+    List<ClassSessionResponse> getSessionsForStudent(Long studentId, LocalDate from, LocalDate to, StudioTimezone viewerTimezone);
 
     /**
      * Returns a single session by ID.
@@ -42,7 +51,11 @@ public interface ClassSessionService {
      * @param sessionId the session ID
      * @return the session
      */
-    ClassSessionResponse getSessionById(Long sessionId);
+    default ClassSessionResponse getSessionById(Long sessionId) {
+        return getSessionById(sessionId, StudioTimezone.SPAIN);
+    }
+
+    ClassSessionResponse getSessionById(Long sessionId, StudioTimezone viewerTimezone);
 
     /**
      * Partially updates a session's date/time/duration/status/payment/note.
@@ -51,7 +64,11 @@ public interface ClassSessionService {
      * @param request   fields to update
      * @return the updated session
      */
-    ClassSessionResponse updateSession(Long sessionId, UpdateSessionRequest request);
+    default ClassSessionResponse updateSession(Long sessionId, UpdateSessionRequest request) {
+        return updateSession(sessionId, request, StudioTimezone.SPAIN);
+    }
+
+    ClassSessionResponse updateSession(Long sessionId, UpdateSessionRequest request, StudioTimezone viewerTimezone);
 
     /**
      * Cancels a class session with configurable payment handling.
@@ -60,7 +77,11 @@ public interface ClassSessionService {
      * @param request   cancellation options
      * @return the updated session
      */
-    ClassSessionResponse cancelSession(Long sessionId, CancelSessionRequest request);
+    default ClassSessionResponse cancelSession(Long sessionId, CancelSessionRequest request) {
+        return cancelSession(sessionId, request, StudioTimezone.SPAIN);
+    }
+
+    ClassSessionResponse cancelSession(Long sessionId, CancelSessionRequest request, StudioTimezone viewerTimezone);
 
     /**
      * Marks a session as paid.
@@ -73,7 +94,11 @@ public interface ClassSessionService {
      * @param request   optional amount override (PER_CLASS only)
      * @return the updated session
      */
-    ClassSessionResponse markSessionPaid(Long sessionId, PaySessionRequest request);
+    default ClassSessionResponse markSessionPaid(Long sessionId, PaySessionRequest request) {
+        return markSessionPaid(sessionId, request, StudioTimezone.SPAIN);
+    }
+
+    ClassSessionResponse markSessionPaid(Long sessionId, PaySessionRequest request, StudioTimezone viewerTimezone);
 
     /**
      * Sets session completion state.
@@ -82,7 +107,11 @@ public interface ClassSessionService {
      * @param completed  true -> COMPLETED, false -> SCHEDULED
      * @return the updated session
      */
-    ClassSessionResponse setSessionCompletion(Long sessionId, boolean completed);
+    default ClassSessionResponse setSessionCompletion(Long sessionId, boolean completed) {
+        return setSessionCompletion(sessionId, completed, StudioTimezone.SPAIN);
+    }
+
+    ClassSessionResponse setSessionCompletion(Long sessionId, boolean completed, StudioTimezone viewerTimezone);
 
     /**
      * Cancels the payment for a session, reverting it to {@code UNPAID}.
@@ -91,7 +120,11 @@ public interface ClassSessionService {
      * @param sessionId the session ID
      * @return the updated session
      */
-    ClassSessionResponse cancelSessionPayment(Long sessionId);
+    default ClassSessionResponse cancelSessionPayment(Long sessionId) {
+        return cancelSessionPayment(sessionId, StudioTimezone.SPAIN);
+    }
+
+    ClassSessionResponse cancelSessionPayment(Long sessionId, StudioTimezone viewerTimezone);
 
     /**
      * Moves a payment from a cancelled or unpaid session to another session.
@@ -100,7 +133,11 @@ public interface ClassSessionService {
      * @param request   the target session details
      * @return the updated target session
      */
-    ClassSessionResponse movePayment(Long sessionId, MovePaymentRequest request);
+    default ClassSessionResponse movePayment(Long sessionId, MovePaymentRequest request) {
+        return movePayment(sessionId, request, StudioTimezone.SPAIN);
+    }
+
+    ClassSessionResponse movePayment(Long sessionId, MovePaymentRequest request, StudioTimezone viewerTimezone);
 
     /**
      * Returns all sessions for a student filtered by payment status.
@@ -109,7 +146,11 @@ public interface ClassSessionService {
      * @param paymentStatus the desired payment status
      * @return matching sessions
      */
-    List<ClassSessionResponse> getSessionsByPaymentStatus(Long studentId, PaymentStatus paymentStatus);
+    default List<ClassSessionResponse> getSessionsByPaymentStatus(Long studentId, PaymentStatus paymentStatus) {
+        return getSessionsByPaymentStatus(studentId, paymentStatus, StudioTimezone.SPAIN);
+    }
+
+    List<ClassSessionResponse> getSessionsByPaymentStatus(Long studentId, PaymentStatus paymentStatus, StudioTimezone viewerTimezone);
 
 
     /**
@@ -119,5 +160,9 @@ public interface ClassSessionService {
      * @param to   end date (inclusive)
      * @return list of calendar days with their sessions
      */
-    List<CalendarDayResponse> getCalendar(LocalDate from, LocalDate to);
+    default List<CalendarDayResponse> getCalendar(LocalDate from, LocalDate to) {
+        return getCalendar(from, to, StudioTimezone.SPAIN);
+    }
+
+    List<CalendarDayResponse> getCalendar(LocalDate from, LocalDate to, StudioTimezone viewerTimezone);
 }

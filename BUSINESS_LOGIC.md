@@ -34,6 +34,11 @@ situation.
 | `PackagePurchase` | A prepaid block of N classes. Tracks `classesRemaining` as sessions are consumed.      |
 | `Payer`           | A third-party contact (e.g. parent) who pays on behalf of the student.                 |
 
+Student availability fields:
+- `startDate` — earliest date when sessions can be created for the student.
+- `holidayMode`, `holidayFrom`, `holidayTo` — controls temporary pause in attendance.
+- `stoppedAttending` — blocks new sessions/schedule edits while keeping student visible in API lists.
+
 ### Status Enums
 
 **`ClassStatus`** — the status of the class itself:
@@ -100,6 +105,15 @@ Supported manual actions:
 - `PUT /api/sessions/{id}` — unified partial update (date/time/duration/status/payment toggle/note)
 - `POST /api/sessions/{id}/completion?completed=true|false` — sets `status` to `COMPLETED` or `SCHEDULED`
 - `POST /api/sessions/{id}/pay`, `/cancel`, `/cancel-payment`, `/move-payment` remain available
+
+Availability checks before creating/updating class dates:
+- reject if `classDate < student.startDate`
+- reject if `student.holidayMode = true` and `classDate >= holidayFrom`
+- reject if `student.stoppedAttending = true`
+
+Holiday update behavior (`PUT /api/students/{id}`):
+- `holidayMode=true` requires `holidayFrom`; existing sessions from that date are auto-cancelled.
+- `holidayMode=false` requires `holidayTo`; auto-cancelled sessions on/after return date are restored to `SCHEDULED`.
 
 ---
 

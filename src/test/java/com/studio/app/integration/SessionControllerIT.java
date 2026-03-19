@@ -34,6 +34,7 @@ class SessionControllerIT extends BaseIntegrationTest {
                     .andExpect(jsonPath("$.durationMinutes").value(45))
                     .andExpect(jsonPath("$.oneOff").value(true))
                     .andExpect(jsonPath("$.note").value("Extra class"))
+                    .andExpect(jsonPath("$.timezone").value("SPAIN"))
                     .andExpect(jsonPath("$.currency").value("EUROS"))
                     .andExpect(jsonPath("$.priceCharged").value(30.00))
                     .andExpect(jsonPath("$.convertedPrices").isMap());
@@ -64,6 +65,75 @@ class SessionControllerIT extends BaseIntegrationTest {
                                     }
                                     """))
                     .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        void shouldReturn400WhenClassDateIsBeforeStudentStartDate() throws Exception {
+            mockMvc.perform(put("/api/students/1")
+                            .contentType(JSON)
+                            .content("""
+                                    { "startDate": "2026-03-15" }
+                                    """))
+                    .andExpect(status().isOk());
+
+            mockMvc.perform(post("/api/students/1/sessions")
+                            .contentType(JSON)
+                            .content("""
+                                    {
+                                      "classDate": "2026-03-10",
+                                      "startTime": "14:00",
+                                      "durationMinutes": 60
+                                    }
+                                    """))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message", containsString("startDate")));
+        }
+
+        @Test
+        void shouldReturn400WhenStudentIsOnHoliday() throws Exception {
+            mockMvc.perform(put("/api/students/1")
+                            .contentType(JSON)
+                            .content("""
+                                    {
+                                      "holidayMode": true,
+                                      "holidayFrom": "2026-03-10"
+                                    }
+                                    """))
+                    .andExpect(status().isOk());
+
+            mockMvc.perform(post("/api/students/1/sessions")
+                            .contentType(JSON)
+                            .content("""
+                                    {
+                                      "classDate": "2026-03-20",
+                                      "startTime": "14:00",
+                                      "durationMinutes": 60
+                                    }
+                                    """))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message", containsString("holiday")));
+        }
+
+        @Test
+        void shouldReturn400WhenStudentStoppedAttending() throws Exception {
+            mockMvc.perform(put("/api/students/1")
+                            .contentType(JSON)
+                            .content("""
+                                    { "stoppedAttending": true }
+                                    """))
+                    .andExpect(status().isOk());
+
+            mockMvc.perform(post("/api/students/1/sessions")
+                            .contentType(JSON)
+                            .content("""
+                                    {
+                                      "classDate": "2026-03-20",
+                                      "startTime": "14:00",
+                                      "durationMinutes": 60
+                                    }
+                                    """))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message", containsString("stopped attending")));
         }
     }
 
@@ -122,6 +192,7 @@ class SessionControllerIT extends BaseIntegrationTest {
                     .andExpect(jsonPath("$.id").value(1))
                     .andExpect(jsonPath("$.priceCharged").value(30.00))
                     .andExpect(jsonPath("$.currency").value("EUROS"))
+                    .andExpect(jsonPath("$.timezone").value("SPAIN"))
                     .andExpect(jsonPath("$.convertedPrices.EUROS").isNumber())
                     .andExpect(jsonPath("$.convertedPrices.DOLLARS").isNumber())
                     .andExpect(jsonPath("$.convertedPrices.RUBLES").isNumber());

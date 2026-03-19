@@ -59,6 +59,27 @@ class ScheduleControllerIT extends BaseIntegrationTest {
                                     """))
                     .andExpect(status().isBadRequest());
         }
+
+        @Test
+        void shouldReturn400ForStoppedAttendingStudent() throws Exception {
+            mockMvc.perform(put("/api/students/1")
+                            .contentType(JSON)
+                            .content("""
+                                    { "stoppedAttending": true }
+                                    """))
+                    .andExpect(status().isOk());
+
+            mockMvc.perform(post("/api/students/1/schedules")
+                            .contentType(JSON)
+                            .content("""
+                                    {
+                                      "dayOfWeek": "FRIDAY",
+                                      "startTime": "16:00",
+                                      "durationMinutes": 45
+                                    }
+                                    """))
+                    .andExpect(status().isBadRequest());
+        }
     }
 
     @Nested

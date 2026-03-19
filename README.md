@@ -101,7 +101,7 @@ db/
 │   ├── 00_create_schema.sql
 │   ├── 01_create_tables.sql
 │   ├── 02_create_indexes.sql
-│   └── 03–06_*.sql                      # additive migrations
+│   └── 03–07_*.sql                      # additive migrations
 ├── scripts/
 │   ├── apply-pending-init.sh            # container-native auto migration runner
 │   ├── backup.ps1
@@ -260,6 +260,11 @@ cached value is used as a fallback.
   "currency": "EUROS",
   "timezone": "SPAIN",
   "classType": "CASUAL",
+  "startDate": "2026-03-01",
+  "holidayMode": false,
+  "holidayFrom": null,
+  "holidayTo": null,
+  "stoppedAttending": false,
   "notes": "Prefers morning classes"
 }
 ```
@@ -269,6 +274,12 @@ cached value is used as a fallback.
 `classType`: `CASUAL` | `EGE` | `OGE` | `IELTS` | `TOFEL`
 
 Student responses also include `debtor` (boolean), maintained by the debtor batch process.
+
+Lifecycle fields:
+- `startDate` blocks creating classes before that date.
+- `holidayMode=true` requires `holidayFrom`; classes are auto-cancelled from that date.
+- turning holiday off requires `holidayTo` (return date), and auto-cancelled future sessions from that day are restored.
+- `stoppedAttending=true` keeps student visible but blocks new sessions/schedule edits.
 
 ---
 
@@ -311,6 +322,8 @@ Student responses also include `debtor` (boolean), maintained by the debtor batc
 | POST   | `/api/students/{id}/sessions`                | Add a one-off (extra/moved) class                |
 | GET    | `/api/students/{id}/sessions`                | All sessions; `?from=&to=` date filter           |
 | GET    | `/api/students/{id}/sessions/by-payment`     | Filter by `?paymentStatus=PAID\|UNPAID\|PACKAGE` |
+
+One-off creation now validates student availability: date must be on/after `startDate`, student must not be in active holiday mode, and must not be marked as stopped attending.
 
 ```json
 {

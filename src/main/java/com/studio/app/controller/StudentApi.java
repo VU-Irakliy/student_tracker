@@ -21,7 +21,14 @@ import java.util.List;
 public interface StudentApi {
 
     /**
-     * Registers a new student with pricing type, class type, price, and timezone.
+     * Registers a new student with pricing, class type, timezone, and lifecycle controls.
+     *
+     * <p>Optional lifecycle fields:
+     * <ul>
+     *   <li>{@code startDate} — earliest class date allowed for this student.</li>
+     *   <li>{@code holidayMode=true} requires {@code holidayFrom}.</li>
+     *   <li>{@code stoppedAttending=true} keeps the student visible but blocks new classes/schedules.</li>
+     * </ul>
      *
      * @param request the student creation details
      * @return the created {@link StudentResponse}
@@ -52,6 +59,12 @@ public interface StudentApi {
 
     /**
      * Partially updates a student. Only non-null fields in the request are applied.
+     *
+     * <p>Holiday state transitions:
+     * <ul>
+     *   <li>set {@code holidayMode=true} with {@code holidayFrom} to start holiday mode</li>
+     *   <li>set {@code holidayMode=false} with {@code holidayTo} to return from holiday</li>
+     * </ul>
      *
      * @param id      the ID of the student to update
      * @param request the fields to update

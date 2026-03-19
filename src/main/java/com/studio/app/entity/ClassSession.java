@@ -3,6 +3,7 @@ package com.studio.app.entity;
 import com.studio.app.enums.ClassStatus;
 import com.studio.app.enums.Currency;
 import com.studio.app.enums.PaymentStatus;
+import com.studio.app.enums.StudioTimezone;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -64,6 +65,11 @@ public class ClassSession extends BaseEntity {
     /** Start time of the class (in the student's local timezone). */
     @Column(name = "start_time", nullable = false)
     private LocalTime startTime;
+
+    /** Timezone snapshot inherited from the student at session creation/update time. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "timezone", nullable = false)
+    private StudioTimezone timezone;
 
     /** Duration in minutes. */
     @Column(name = "duration_minutes", nullable = false)

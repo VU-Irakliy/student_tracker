@@ -3,6 +3,7 @@ import com.studio.app.controller.StudentSessionApi;
 import com.studio.app.dto.request.OneOffSessionRequest;
 import com.studio.app.dto.response.ClassSessionResponse;
 import com.studio.app.enums.PaymentStatus;
+import com.studio.app.enums.StudioTimezone;
 import com.studio.app.service.ClassSessionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -22,20 +23,24 @@ public class StudentSessionController implements StudentSessionApi {
 
     /** {@inheritDoc} */
     @Override
-    public ResponseEntity<ClassSessionResponse> createOneOffSession(Long studentId, OneOffSessionRequest request) {
+    public ResponseEntity<ClassSessionResponse> createOneOffSession(Long studentId, OneOffSessionRequest request,
+                                                                    StudioTimezone timezone) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(sessionService.createOneOffSession(studentId, request));
+                .body(sessionService.createOneOffSession(studentId, request, timezone));
     }
 
     /** {@inheritDoc} */
     @Override
-    public ResponseEntity<List<ClassSessionResponse>> getSessionsForStudent(Long studentId, LocalDate from, LocalDate to) {
-        return ResponseEntity.ok(sessionService.getSessionsForStudent(studentId, from, to));
+    public ResponseEntity<List<ClassSessionResponse>> getSessionsForStudent(Long studentId, LocalDate from,
+                                                                            LocalDate to, StudioTimezone timezone) {
+        return ResponseEntity.ok(sessionService.getSessionsForStudent(studentId, from, to, timezone));
     }
 
     /** {@inheritDoc} */
     @Override
-    public ResponseEntity<List<ClassSessionResponse>> getSessionsByPayment(Long studentId, PaymentStatus paymentStatus) {
-        return ResponseEntity.ok(sessionService.getSessionsByPaymentStatus(studentId, paymentStatus));
+    public ResponseEntity<List<ClassSessionResponse>> getSessionsByPayment(Long studentId,
+                                                                           PaymentStatus paymentStatus,
+                                                                           StudioTimezone timezone) {
+        return ResponseEntity.ok(sessionService.getSessionsByPaymentStatus(studentId, paymentStatus, timezone));
     }
 }

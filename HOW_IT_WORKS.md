@@ -50,6 +50,9 @@ Each student has a profile with:
 - **Currency** — Euros, Dollars, or Rubles
 - **Timezone** — Spain or Russia (Moscow) — used for display purposes
 - **Class type** — Casual, EGE, OGE, IELTS, or TOFEL
+- **Start date** — classes cannot be created before this date
+- **Holiday mode** — temporary pause with a start date (and return date when the student comes back)
+- **Stopped attending** — keeps the student in the list but blocks new schedules/classes
 - **Notes** — anything you want to remember about them
 - **Debtor flag** — automatically turns on if a lesson has happened and is still unpaid
 
@@ -110,6 +113,11 @@ If a student has an extra class that's not part of their regular schedule — fo
 a make-up lesson or a class moved from another day — you can add it as a **one-off**.
 One-off classes work exactly like regular ones but are flagged separately so you can tell
 them apart.
+
+Before creating/updating a class date, the app checks:
+- the date is not before the student's start date,
+- the student is not currently on holiday,
+- the student is not marked as stopped attending.
 
 ### Updating class details in one place
 

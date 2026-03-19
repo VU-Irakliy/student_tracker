@@ -8,6 +8,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -74,6 +75,28 @@ public class Student extends BaseEntity {
     @Column(name = "class_type", nullable = false)
     @Builder.Default
     private StudentClassType classType = StudentClassType.CASUAL;
+
+    /** Date from which the student can start having classes. */
+    @Column(name = "start_date")
+    private LocalDate startDate;
+
+    /** True while the student is on holiday; classes in that period are blocked/cancelled. */
+    @Column(name = "holiday_mode", nullable = false)
+    @Builder.Default
+    private boolean holidayMode = false;
+
+    /** First day of the holiday period (inclusive). */
+    @Column(name = "holiday_from")
+    private LocalDate holidayFrom;
+
+    /** Day when the student is back from holiday (inclusive). */
+    @Column(name = "holiday_to")
+    private LocalDate holidayTo;
+
+    /** True when the student stopped attending classes but should remain visible in lists. */
+    @Column(name = "stopped_attending", nullable = false)
+    @Builder.Default
+    private boolean stoppedAttending = false;
 
     /** Notes visible to the teacher/admin. */
     @Column(name = "notes", columnDefinition = "TEXT")
