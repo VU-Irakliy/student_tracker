@@ -1,7 +1,6 @@
 package com.studio.app.service.impl;
 
 import com.studio.app.dto.request.CancelSessionRequest;
-import com.studio.app.dto.request.MovePaymentRequest;
 import com.studio.app.dto.request.OneOffSessionRequest;
 import com.studio.app.dto.request.PaySessionRequest;
 import com.studio.app.dto.request.UpdateSessionRequest;
@@ -152,16 +151,7 @@ class ClassSessionServiceImplTest {
         assertThat(pkg.getClassesRemaining()).isEqualTo(7);
     }
 
-    @Test
-    void shouldMovePaymentBetweenSessions() {
-        sessionService.movePayment(12L, MovePaymentRequest.builder().targetSessionId(11L).build(), StudioTimezone.SPAIN);
 
-        var source = sessionRepository.findByIdAndDeletedFalse(12L).orElseThrow();
-        var target = sessionRepository.findByIdAndDeletedFalse(11L).orElseThrow();
-        assertThat(source.getPaymentStatus()).isEqualTo(PaymentStatus.UNPAID);
-        assertThat(target.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
-        assertThat(target.getPriceCharged()).isEqualByComparingTo("30.00");
-    }
 
     @Test
     void shouldCancelPaymentAndReturnSlotToPackage() {

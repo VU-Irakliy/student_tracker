@@ -2,7 +2,6 @@ package com.studio.app.controller;
 
 import com.studio.app.constant.ApiConstants;
 import com.studio.app.dto.request.CancelSessionRequest;
-import com.studio.app.dto.request.MovePaymentRequest;
 import com.studio.app.dto.request.PaySessionRequest;
 import com.studio.app.dto.request.UpdateSessionRequest;
 import com.studio.app.dto.response.ClassSessionResponse;
@@ -101,16 +100,5 @@ public interface SessionApi {
     ResponseEntity<ClassSessionResponse> cancelPayment(@PathVariable Long sessionId,
                                                        @RequestParam(defaultValue = "SPAIN") StudioTimezone timezone);
 
-    /**
-     * Transfers payment from this session (must be PAID) to another session.
-     *
-     * @param sessionId the ID of the source session (currently paid)
-     * @param request   the move-payment details including the target session ID
-     * @return the updated {@link ClassSessionResponse} for the source session
-     */
-    @Operation(summary = "Move a payment", description = "Transfers payment from this session (must be PAID) to another session.")
-    @PostMapping("/{sessionId}/move-payment")
-    ResponseEntity<ClassSessionResponse> movePayment(@PathVariable Long sessionId,
-                                                     @Valid @RequestBody MovePaymentRequest request,
-                                                     @RequestParam(defaultValue = "SPAIN") StudioTimezone timezone);
+
 }

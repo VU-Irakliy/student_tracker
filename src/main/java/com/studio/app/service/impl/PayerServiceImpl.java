@@ -47,6 +47,9 @@ public class PayerServiceImpl implements PayerService {
     @Override
     @Transactional(readOnly = true)
     public List<PayerResponse> getPayersForStudent(Long studentId) {
+        studentRepository.findByIdAndDeletedFalse(studentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Student", studentId));
+
         return payerMapper.toResponseList(
                 payerRepository.findByStudentIdAndDeletedFalse(studentId));
     }

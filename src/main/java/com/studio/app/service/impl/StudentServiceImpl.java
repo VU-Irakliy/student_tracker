@@ -90,8 +90,7 @@ public class StudentServiceImpl implements StudentService {
         Optional.ofNullable(request.getLastName()).ifPresent(student::setLastName);
         Optional.ofNullable(request.getPhoneNumber()).ifPresent(student::setPhoneNumber);
         Optional.ofNullable(request.getPricingType()).ifPresent(student::setPricingType);
-        Optional.ofNullable(request.getPricePerClass()).ifPresent(student::setPricePerClass);
-        Optional.ofNullable(request.getCurrency()).ifPresent(student::setCurrency);
+        applyPricingFieldUpdates(student, request);
         Optional.ofNullable(request.getTimezone()).ifPresent(student::setTimezone);
         Optional.ofNullable(request.getClassType()).ifPresent(student::setClassType);
         Optional.ofNullable(request.getStartDate()).ifPresent(student::setStartDate);
@@ -214,6 +213,16 @@ public class StudentServiceImpl implements StudentService {
         if (student.getHolidayFrom() != null && student.getHolidayTo() != null
                 && student.getHolidayTo().isBefore(student.getHolidayFrom())) {
             throw new BadRequestException("holidayTo must be on or after holidayFrom");
+        }
+    }
+
+    private void applyPricingFieldUpdates(Student student, UpdateStudentRequest request) {
+        // Nulls are treated as "no change" for partial updates.
+        if (request.getPricePerClass() != null) {
+            student.setPricePerClass(request.getPricePerClass());
+        }
+        if (request.getCurrency() != null) {
+            student.setCurrency(request.getCurrency());
         }
     }
 

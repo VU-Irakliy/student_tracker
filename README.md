@@ -101,7 +101,7 @@ db/
 │   ├── 00_create_schema.sql
 │   ├── 01_create_tables.sql
 │   ├── 02_create_indexes.sql
-│   └── 03–07_*.sql                      # additive migrations
+│   └── 03+_*.sql                        # additive migrations
 ├── scripts/
 │   ├── apply-pending-init.sh            # container-native auto migration runner
 │   ├── backup.ps1
@@ -273,6 +273,9 @@ cached value is used as a fallback.
 `timezone`: `SPAIN` | `RUSSIA_MOSCOW`
 `classType`: `CASUAL` | `EGE` | `OGE` | `IELTS` | `TOFEL`
 
+Partial update semantics:
+- sending `null` for `pricePerClass` and/or `currency` keeps existing stored values unchanged.
+
 Student responses also include `debtor` (boolean), maintained by the debtor batch process.
 
 Lifecycle fields:
@@ -325,6 +328,10 @@ Lifecycle fields:
 
 One-off creation now validates student availability: date must be on/after `startDate`, student must not be in active holiday mode, and must not be marked as stopped attending.
 
+Student-scoped list behaviour:
+- if student does not exist (or is soft-deleted), `GET /sessions` and `GET /sessions/by-payment` return `404`.
+- date filtering supports full range (`from` + `to`) and single-sided filters (`from` only or `to` only).
+
 ```json
 {
   "classDate": "2026-04-20",
@@ -344,7 +351,6 @@ One-off creation now validates student availability: date must be on/after `star
 | POST   | `/api/sessions/{id}/pay`                | Mark as paid (auto-deducts from active package for PACKAGE type) |
 | POST   | `/api/sessions/{id}/completion`         | Set completion state via `?completed=true\|false`               |
 | POST   | `/api/sessions/{id}/cancel-payment`     | Revert payment (→ UNPAID or return slot to package)              |
-| POST   | `/api/sessions/{id}/move-payment`       | Move payment to another session                                  |
 
 **Cancel:**
 ```json
@@ -373,11 +379,6 @@ One-off creation now validates student availability: date must be on/after `star
 ```
 POST /api/sessions/{id}/completion?completed=true
 POST /api/sessions/{id}/completion?completed=false
-```
-
-**Move payment:**
-```json
-{ "targetSessionId": 42 }
 ```
 
 ---
@@ -475,7 +476,7 @@ Exported file name format:
 | Scenario                                | Behaviour                                                                                  |
 |-----------------------------------------|--------------------------------------------------------------------------------------------|
 | Cancel + keep as paid                   | `status=CANCELLED`, payment status unchanged, package slot NOT returned                    |
-| Cancel + release payment (PER_CLASS)    | `paymentStatus=UNPAID`; use `/move-payment` to reassign to another session                 |
+| Cancel + release payment (PER_CLASS)    | `paymentStatus=UNPAID`; then mark target session as paid (optionally with `amountOverride`) |
 | Cancel + release payment (PACKAGE)      | Package slot returned (`classesRemaining + 1`); session unlinked from package              |
 | Cancel already-cancelled session        | `400 Bad Request`                                                                          |
 | Cancel payment on UNPAID session        | `400 Bad Request`                                                                          |
@@ -484,7 +485,6 @@ Exported file name format:
 | Pay already-paid session                | `400 Bad Request`                                                                          |
 | Set completion state                    | `/completion?completed=true\|false` switches `status` between `COMPLETED` and `SCHEDULED` |
 | Unified session update                  | `PUT /api/sessions/{id}` can update schedule fields, status, payment toggle, and note     |
-| Move payment (source must be PAID)      | Source → `UNPAID`, target → `PAID`, price transferred                                     |
 | Student soft-delete                     | Student + schedules + payers soft-deleted; only **future** sessions deleted, past kept     |
 | Debtor status                           | After 22:00 local time, students with already-happened `UNPAID` sessions are marked debtor |
 | Debtor startup catch-up                 | On app startup, debtor recomputation runs once without waiting for 22:00                   |

@@ -9,7 +9,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
-import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
 
@@ -22,7 +21,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @ActiveProfiles("test")
-@Import(DebtorStatusServiceImplTest.DebtorClockConfig.class)
 @Sql(scripts = "/cleanup-test.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 @Sql(scripts = "/testdata/service/debtor/seed.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 @Sql(scripts = "/cleanup-test.sql", executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
@@ -96,12 +94,6 @@ class DebtorStatusServiceImplTest {
         @Primary
         MutableClock mutableClock() {
             return new MutableClock(Instant.parse("2026-03-15T22:30:00Z"), ZoneOffset.UTC);
-        }
-
-        @Bean
-        @Primary
-        Clock appClock(MutableClock mutableClock) {
-            return mutableClock;
         }
     }
 

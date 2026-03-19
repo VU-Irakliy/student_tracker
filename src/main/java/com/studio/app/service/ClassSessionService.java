@@ -1,7 +1,6 @@
 package com.studio.app.service;
 
 import com.studio.app.dto.request.CancelSessionRequest;
-import com.studio.app.dto.request.MovePaymentRequest;
 import com.studio.app.dto.request.OneOffSessionRequest;
 import com.studio.app.dto.request.PaySessionRequest;
 import com.studio.app.dto.request.UpdateSessionRequest;
@@ -126,18 +125,6 @@ public interface ClassSessionService {
 
     ClassSessionResponse cancelSessionPayment(Long sessionId, StudioTimezone viewerTimezone);
 
-    /**
-     * Moves a payment from a cancelled or unpaid session to another session.
-     *
-     * @param sessionId the source session ID
-     * @param request   the target session details
-     * @return the updated target session
-     */
-    default ClassSessionResponse movePayment(Long sessionId, MovePaymentRequest request) {
-        return movePayment(sessionId, request, StudioTimezone.SPAIN);
-    }
-
-    ClassSessionResponse movePayment(Long sessionId, MovePaymentRequest request, StudioTimezone viewerTimezone);
 
     /**
      * Returns all sessions for a student filtered by payment status.

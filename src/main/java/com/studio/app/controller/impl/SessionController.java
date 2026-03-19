@@ -1,7 +1,6 @@
 package com.studio.app.controller.impl;
 import com.studio.app.controller.SessionApi;
 import com.studio.app.dto.request.CancelSessionRequest;
-import com.studio.app.dto.request.MovePaymentRequest;
 import com.studio.app.dto.request.PaySessionRequest;
 import com.studio.app.dto.request.UpdateSessionRequest;
 import com.studio.app.dto.response.ClassSessionResponse;
@@ -61,10 +60,5 @@ public class SessionController implements SessionApi {
         return ResponseEntity.ok(sessionService.cancelSessionPayment(sessionId, timezone));
     }
 
-    /** {@inheritDoc} */
-    @Override
-    public ResponseEntity<ClassSessionResponse> movePayment(Long sessionId, MovePaymentRequest request,
-                                                            StudioTimezone timezone) {
-        return ResponseEntity.ok(sessionService.movePayment(sessionId, request, timezone));
-    }
+
 }

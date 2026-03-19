@@ -1,8 +1,10 @@
 package com.studio.app.integration;
 
+import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.web.servlet.MvcResult;
 
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -351,34 +353,104 @@ class SessionControllerIT extends BaseIntegrationTest {
     }
 
     @Nested
-    class MovePayment {
+    class ReassignPaymentFlow {
 
         @Test
-        void shouldTransferPayment() throws Exception {
-            // Move payment from session 1 (PAID) to session 2 (UNPAID)
-            mockMvc.perform(post("/api/sessions/1/move-payment")
+        void shouldReassignPerClassPaymentUsingCancelPaymentAndPay() throws Exception {
+            MvcResult createResult = mockMvc.perform(post("/api/students/1/sessions")
                             .contentType(JSON)
                             .content("""
-                                    { "targetSessionId": 2 }
+                                    {
+                                      "classDate": "2026-03-20",
+                                      "startTime": "14:00",
+                                      "durationMinutes": 60,
+                                      "note": "Moved from session 1"
+                                    }
+                                    """))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.paymentStatus").value("UNPAID"))
+                    .andReturn();
+
+            Number targetSessionId = JsonPath.read(
+                    createResult.getResponse().getContentAsString(), "$.id");
+
+            mockMvc.perform(post("/api/sessions/1/cancel-payment"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.paymentStatus").value("UNPAID"));
+
+            mockMvc.perform(post("/api/sessions/{id}/pay", targetSessionId.longValue())
+                            .contentType(JSON)
+                            .content("""
+                                    { "amountOverride": 30.00 }
                                     """))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.id").value(2))
-                    .andExpect(jsonPath("$.paymentStatus").value("PAID"));
-
-            // Verify source is now UNPAID
-            mockMvc.perform(get("/api/sessions/1"))
-                    .andExpect(jsonPath("$.paymentStatus").value("UNPAID"));
+                    .andExpect(jsonPath("$.paymentStatus").value("PAID"))
+                    .andExpect(jsonPath("$.priceCharged").value(30.00));
         }
 
         @Test
-        void shouldReturn400WhenSourceNotPaid() throws Exception {
-            mockMvc.perform(post("/api/sessions/2/move-payment")
+        void shouldReassignPackageSlotUsingCancelPaymentAndPay() throws Exception {
+            MvcResult firstSessionResult = mockMvc.perform(post("/api/students/2/sessions")
                             .contentType(JSON)
                             .content("""
-                                    { "targetSessionId": 3 }
+                                    {
+                                      "classDate": "2026-03-20",
+                                      "startTime": "14:00",
+                                      "durationMinutes": 45,
+                                      "note": "Original package session"
+                                    }
                                     """))
-                    .andExpect(status().isBadRequest());
+                    .andExpect(status().isCreated())
+                    .andReturn();
+
+            Number sourceSessionId = JsonPath.read(
+                    firstSessionResult.getResponse().getContentAsString(), "$.id");
+
+            MvcResult secondSessionResult = mockMvc.perform(post("/api/students/2/sessions")
+                            .contentType(JSON)
+                            .content("""
+                                    {
+                                      "classDate": "2026-03-21",
+                                      "startTime": "14:00",
+                                      "durationMinutes": 45,
+                                      "note": "Moved package session"
+                                    }
+                                    """))
+                    .andExpect(status().isCreated())
+                    .andReturn();
+
+            Number targetSessionId = JsonPath.read(
+                    secondSessionResult.getResponse().getContentAsString(), "$.id");
+
+            mockMvc.perform(post("/api/sessions/{id}/pay", sourceSessionId.longValue())
+                            .contentType(JSON)
+                            .content("{}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.paymentStatus").value("PACKAGE"));
+
+            mockMvc.perform(get("/api/packages/1"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.classesRemaining").value(7));
+
+            mockMvc.perform(post("/api/sessions/{id}/cancel-payment", sourceSessionId.longValue()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.paymentStatus").value("UNPAID"));
+
+            mockMvc.perform(get("/api/packages/1"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.classesRemaining").value(8));
+
+            mockMvc.perform(post("/api/sessions/{id}/pay", targetSessionId.longValue())
+                            .contentType(JSON)
+                            .content("{}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.paymentStatus").value("PACKAGE"));
+
+            mockMvc.perform(get("/api/packages/1"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.classesRemaining").value(7));
         }
     }
+    
 }
 

@@ -56,6 +56,9 @@ public class PackageServiceImpl implements PackageService {
     @Override
     @Transactional(readOnly = true)
     public List<PackagePurchaseResponse> getPackagesForStudent(Long studentId) {
+        studentRepository.findByIdAndDeletedFalse(studentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Student", studentId));
+
         return packageMapper.toResponseList(
                 packageRepository.findByStudentIdAndDeletedFalseOrderByPaymentDateDesc(studentId))
                 .stream().map(this::enrichWithConvertedAmountPaid).toList();
@@ -65,6 +68,9 @@ public class PackageServiceImpl implements PackageService {
     @Override
     @Transactional(readOnly = true)
     public List<PackagePurchaseResponse> getActivePackagesForStudent(Long studentId) {
+        studentRepository.findByIdAndDeletedFalse(studentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Student", studentId));
+
         return packageMapper.toResponseList(
                 packageRepository.findActivePackagesByStudent(studentId))
                 .stream().map(this::enrichWithConvertedAmountPaid).toList();

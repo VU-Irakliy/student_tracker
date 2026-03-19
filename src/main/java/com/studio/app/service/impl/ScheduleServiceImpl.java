@@ -60,6 +60,9 @@ public class ScheduleServiceImpl implements ScheduleService {
     @Override
     @Transactional(readOnly = true)
     public List<WeeklyScheduleResponse> getSchedulesForStudent(Long studentId) {
+        studentRepository.findByIdAndDeletedFalse(studentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Student", studentId));
+
         return scheduleRepository.findByStudentIdAndDeletedFalse(studentId)
                 .stream()
                 .map(studentMapper::toWeeklyScheduleResponse)

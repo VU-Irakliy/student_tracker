@@ -1,7 +1,6 @@
 package com.studio.app.service.impl;
 
 import com.studio.app.dto.request.CancelSessionRequest;
-import com.studio.app.dto.request.MovePaymentRequest;
 import com.studio.app.dto.request.OneOffSessionRequest;
 import com.studio.app.dto.request.PaySessionRequest;
 import com.studio.app.dto.request.UpdateSessionRequest;
@@ -76,9 +75,15 @@ public class ClassSessionServiceImpl implements ClassSessionService {
     @Transactional(readOnly = true)
     public List<ClassSessionResponse> getSessionsForStudent(Long studentId, LocalDate from, LocalDate to,
                                                             StudioTimezone viewerTimezone) {
+        findActiveStudent(studentId);
+
         var sessions = (from != null && to != null)
                 ? sessionRepository.findByStudentIdAndDateRange(studentId, from, to)
-                : sessionRepository.findByStudentIdAndDeletedFalseOrderByClassDateAscStartTimeAsc(studentId);
+                : (from != null)
+                    ? sessionRepository.findByStudentIdAndClassDateGreaterThanEqualAndDeletedFalseOrderByClassDateAscStartTimeAsc(studentId, from)
+                    : (to != null)
+                        ? sessionRepository.findByStudentIdAndClassDateLessThanEqualAndDeletedFalseOrderByClassDateAscStartTimeAsc(studentId, to)
+                        : sessionRepository.findByStudentIdAndDeletedFalseOrderByClassDateAscStartTimeAsc(studentId);
         return sessions.stream().map(session -> toResponse(session, viewerTimezone)).toList();
     }
 
@@ -179,37 +184,14 @@ public class ClassSessionServiceImpl implements ClassSessionService {
         return toResponse(sessionRepository.save(session), viewerTimezone);
     }
 
-    /** {@inheritDoc} */
-    @Override
-    public ClassSessionResponse movePayment(Long sessionId, MovePaymentRequest request,
-                                            StudioTimezone viewerTimezone) {
-        var source = findActiveSession(sessionId);
 
-        if (source.getPaymentStatus() != PaymentStatus.PAID) {
-            throw new BadRequestException("Source session must be in PAID status to move its payment");
-        }
-
-        var target = findActiveSession(request.getTargetSessionId());
-
-        if (target.getPaymentStatus() == PaymentStatus.PAID) {
-            throw new BadRequestException("Target session is already paid");
-        }
-
-        // Transfer payment
-        target.setPriceCharged(source.getPriceCharged());
-        target.setPaymentStatus(PaymentStatus.PAID);
-
-        source.setPaymentStatus(PaymentStatus.UNPAID);
-
-        sessionRepository.save(source);
-        return toResponse(sessionRepository.save(target), viewerTimezone);
-    }
 
     /** {@inheritDoc} */
     @Override
     @Transactional(readOnly = true)
     public List<ClassSessionResponse> getSessionsByPaymentStatus(Long studentId, PaymentStatus paymentStatus,
                                                                  StudioTimezone viewerTimezone) {
+        findActiveStudent(studentId);
         return sessionRepository.findByStudentIdAndPaymentStatusAndDeletedFalse(studentId, paymentStatus)
                 .stream().map(session -> toResponse(session, viewerTimezone)).toList();
     }
@@ -292,6 +274,11 @@ public class ClassSessionServiceImpl implements ClassSessionService {
     private ClassSession findActiveSession(Long id) {
         return sessionRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("ClassSession", id));
+    }
+
+    private Student findActiveStudent(Long studentId) {
+        return studentRepository.findByIdAndDeletedFalse(studentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Student", studentId));
     }
 
     private void markPaidInternal(ClassSession session, java.math.BigDecimal amountOverride) {
