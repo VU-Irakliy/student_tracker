@@ -122,6 +122,8 @@ class StudentControllerIT extends BaseIntegrationTest {
                                       "firstName": "X",
                                       "lastName": "Y",
                                       "pricingType": "PER_CLASS",
+                                      "pricePerClass": 50.00,
+                                      "currency": "DOLLARS",
                                       "timezone": "SPAIN",
                                       "holidayMode": true
                                     }
@@ -157,6 +159,41 @@ class StudentControllerIT extends BaseIntegrationTest {
                                     """))
                     .andExpect(status().isBadRequest());
         }
+
+        @Test
+        void shouldReturn400_whenPriceProvidedWithoutCurrency() throws Exception {
+            mockMvc.perform(post("/api/students")
+                            .contentType(JSON)
+                            .content("""
+                                    {
+                                      "firstName": "X",
+                                      "lastName": "Y",
+                                      "pricingType": "PER_CLASS",
+                                      "pricePerClass": 35.00,
+                                      "timezone": "SPAIN"
+                                    }
+                                    """))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message", containsString("currency")));
+        }
+
+        @Test
+        void shouldCreatePackageStudentWithoutPriceAndCurrency() throws Exception {
+            mockMvc.perform(post("/api/students")
+                            .contentType(JSON)
+                            .content("""
+                                    {
+                                      "firstName": "Pkg",
+                                      "lastName": "Student",
+                                      "pricingType": "PACKAGE",
+                                      "timezone": "SPAIN"
+                                    }
+                                    """))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.pricingType").value("PACKAGE"))
+                    .andExpect(jsonPath("$.pricePerClass").isEmpty())
+                    .andExpect(jsonPath("$.currency").isEmpty());
+        }
     }
 
     @Nested
@@ -164,7 +201,7 @@ class StudentControllerIT extends BaseIntegrationTest {
 
         @Test
         void shouldUpdateFirstName() throws Exception {
-            mockMvc.perform(put("/api/students/1")
+            mockMvc.perform(patch("/api/students/1")
                             .contentType(JSON)
                             .content("""
                                     { "firstName": "Anita" }
@@ -176,7 +213,7 @@ class StudentControllerIT extends BaseIntegrationTest {
 
         @Test
         void shouldUpdateCurrency() throws Exception {
-            mockMvc.perform(put("/api/students/1")
+            mockMvc.perform(patch("/api/students/1")
                             .contentType(JSON)
                             .content("""
                                     { "currency": "DOLLARS" }
@@ -187,7 +224,7 @@ class StudentControllerIT extends BaseIntegrationTest {
 
         @Test
         void shouldUpdatePricePerClass() throws Exception {
-            mockMvc.perform(put("/api/students/1")
+            mockMvc.perform(patch("/api/students/1")
                             .contentType(JSON)
                             .content("""
                                     { "pricePerClass": 45.00 }
@@ -198,7 +235,7 @@ class StudentControllerIT extends BaseIntegrationTest {
 
         @Test
         void shouldUpdateNotes() throws Exception {
-            mockMvc.perform(put("/api/students/1")
+            mockMvc.perform(patch("/api/students/1")
                             .contentType(JSON)
                             .content("""
                                     { "notes": "Advanced level now" }
@@ -209,7 +246,7 @@ class StudentControllerIT extends BaseIntegrationTest {
 
         @Test
         void shouldReturn404ForNonExistentStudent() throws Exception {
-            mockMvc.perform(put("/api/students/999")
+            mockMvc.perform(patch("/api/students/999")
                             .contentType(JSON)
                             .content("""
                                     { "firstName": "X" }

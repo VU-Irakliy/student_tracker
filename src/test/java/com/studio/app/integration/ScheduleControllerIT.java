@@ -62,7 +62,7 @@ class ScheduleControllerIT extends BaseIntegrationTest {
 
         @Test
         void shouldReturn400ForStoppedAttendingStudent() throws Exception {
-            mockMvc.perform(put("/api/students/1")
+            mockMvc.perform(patch("/api/students/1")
                             .contentType(JSON)
                             .content("""
                                     { "stoppedAttending": true }

@@ -4,7 +4,9 @@ import com.studio.app.dto.request.CreateStudentRequest;
 import com.studio.app.dto.request.UpdateStudentRequest;
 import com.studio.app.dto.response.StudentResponse;
 import com.studio.app.enums.ClassStatus;
+import com.studio.app.enums.Currency;
 import com.studio.app.entity.Student;
+import com.studio.app.enums.PricingType;
 import com.studio.app.enums.StudentClassType;
 import com.studio.app.exception.BadRequestException;
 import com.studio.app.exception.ResourceNotFoundException;
@@ -19,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -43,7 +46,7 @@ public class StudentServiceImpl implements StudentService {
     /** {@inheritDoc} */
     @Override
     public StudentResponse createStudent(CreateStudentRequest request) {
-        validateCreateLifecycle(request);
+        validateCreateStudentRequest(request);
 
         var student = Student.builder()
                 .firstName(request.getFirstName())
@@ -98,6 +101,7 @@ public class StudentServiceImpl implements StudentService {
         Optional.ofNullable(request.getNotes()).ifPresent(student::setNotes);
 
         applyHolidayStateUpdate(student, request);
+        validateUpdatedStudentState(student);
 
         return toResponse(studentRepository.save(student));
     }
@@ -166,13 +170,46 @@ public class StudentServiceImpl implements StudentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Student", id));
     }
 
-    private void validateCreateLifecycle(CreateStudentRequest request) {
+    private void validateCreateStudentRequest(CreateStudentRequest request) {
+        validateFullName(request.getFirstName(), request.getLastName());
+        validatePricingRules(request.getPricingType(), request.getPricePerClass(), request.getCurrency());
+
         if (Boolean.TRUE.equals(request.getHolidayMode()) && request.getHolidayFrom() == null) {
             throw new BadRequestException("holidayFrom is required when holidayMode is true");
+        }
+        if (request.getHolidayTo() != null && request.getHolidayFrom() == null) {
+            throw new BadRequestException("holidayFrom is required when holidayTo is provided");
         }
         if (request.getHolidayFrom() != null && request.getHolidayTo() != null
                 && request.getHolidayTo().isBefore(request.getHolidayFrom())) {
             throw new BadRequestException("holidayTo must be on or after holidayFrom");
+        }
+    }
+
+    private void validateUpdatedStudentState(Student student) {
+        validateFullName(student.getFirstName(), student.getLastName());
+        validatePricingRules(student.getPricingType(), student.getPricePerClass(), student.getCurrency());
+
+        if (student.getHolidayTo() != null && student.getHolidayFrom() == null) {
+            throw new BadRequestException("holidayFrom is required when holidayTo is provided");
+        }
+    }
+
+    private void validateFullName(String firstName, String lastName) {
+        if (firstName == null || firstName.isBlank() || lastName == null || lastName.isBlank()) {
+            throw new BadRequestException("firstName and lastName are required");
+        }
+    }
+
+    private void validatePricingRules(PricingType pricingType, BigDecimal pricePerClass, Currency currency) {
+        if (pricingType == PricingType.PER_CLASS && pricePerClass == null) {
+            throw new BadRequestException("pricePerClass is required when pricingType is PER_CLASS");
+        }
+        if (pricingType == PricingType.PACKAGE && (pricePerClass != null || currency != null)) {
+            throw new BadRequestException("pricePerClass and currency must be null when pricingType is PACKAGE");
+        }
+        if (pricePerClass != null && currency == null) {
+            throw new BadRequestException("currency is required when pricePerClass is provided");
         }
     }
 
@@ -217,6 +254,13 @@ public class StudentServiceImpl implements StudentService {
     }
 
     private void applyPricingFieldUpdates(Student student, UpdateStudentRequest request) {
+        if (request.getPricingType() == PricingType.PACKAGE) {
+            // PACKAGE pricing is tracked per purchase, not on the student profile.
+            student.setPricePerClass(null);
+            student.setCurrency(null);
+            return;
+        }
+
         // Nulls are treated as "no change" for partial updates.
         if (request.getPricePerClass() != null) {
             student.setPricePerClass(request.getPricePerClass());
@@ -275,7 +319,7 @@ public class StudentServiceImpl implements StudentService {
         classSessionRepository
                 .findByStudentIdAndDeletedFalseOrderByClassDateAscStartTimeAsc(studentId)
                 .stream()
-                .filter(session -> !session.getClassDate().isBefore(today))
+                .filter(session -> session.getClassDate().isAfter(today))
                 .forEach(session -> session.setDeleted(true));
     }
 }

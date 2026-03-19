@@ -2,6 +2,7 @@ package com.studio.app.service.impl;
 
 import com.studio.app.dto.request.PackagePurchaseRequest;
 import com.studio.app.enums.Currency;
+import com.studio.app.exception.BadRequestException;
 import com.studio.app.exception.ResourceNotFoundException;
 import com.studio.app.repository.PackagePurchaseRepository;
 import com.studio.app.service.PackageService;
@@ -34,10 +35,11 @@ class PackageServiceImplTest {
     private PackagePurchaseRepository packageRepository;
 
     @Test
-    void shouldCreatePackageWithStudentCurrency() {
+    void shouldCreatePackageWhenCurrencyProvided() {
         var result = packageService.purchasePackage(1L, PackagePurchaseRequest.builder()
                 .totalClasses(10)
                 .amountPaid(new BigDecimal("15000.00"))
+                .currency(Currency.RUBLES)
                 .paymentDate(LocalDate.of(2026, 3, 20))
                 .description("March bundle")
                 .build());
@@ -65,6 +67,7 @@ class PackageServiceImplTest {
         assertThatThrownBy(() -> packageService.purchasePackage(99L, PackagePurchaseRequest.builder()
                 .totalClasses(5)
                 .amountPaid(new BigDecimal("100.00"))
+                .currency(Currency.RUBLES)
                 .paymentDate(LocalDate.of(2026, 3, 20))
                 .build()))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -75,6 +78,7 @@ class PackageServiceImplTest {
         var result = packageService.purchasePackage(1L, PackagePurchaseRequest.builder()
                 .totalClasses(10)
                 .amountPaid(new BigDecimal("15000.00"))
+                .currency(Currency.RUBLES)
                 .paymentDate(LocalDate.of(2026, 3, 20))
                 .build());
 
@@ -104,6 +108,24 @@ class PackageServiceImplTest {
     void getPackageByIdShouldThrowNotFound() {
         assertThatThrownBy(() -> packageService.getPackageById(999L))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void shouldRejectWhenCurrencyMissing() {
+        assertThatThrownBy(() -> packageService.purchasePackage(1L, PackagePurchaseRequest.builder()
+                .totalClasses(5)
+                .amountPaid(new BigDecimal("100.00"))
+                .paymentDate(LocalDate.of(2026, 3, 20))
+                .build()))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("currency");
+    }
+
+    @Test
+    void shouldRejectWhenRequestIsNull() {
+        assertThatThrownBy(() -> packageService.purchasePackage(1L, null))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("request");
     }
 }
 

@@ -71,7 +71,7 @@ class SessionControllerIT extends BaseIntegrationTest {
 
         @Test
         void shouldReturn400WhenClassDateIsBeforeStudentStartDate() throws Exception {
-            mockMvc.perform(put("/api/students/1")
+            mockMvc.perform(patch("/api/students/1")
                             .contentType(JSON)
                             .content("""
                                     { "startDate": "2026-03-15" }
@@ -93,7 +93,7 @@ class SessionControllerIT extends BaseIntegrationTest {
 
         @Test
         void shouldReturn400WhenStudentIsOnHoliday() throws Exception {
-            mockMvc.perform(put("/api/students/1")
+            mockMvc.perform(patch("/api/students/1")
                             .contentType(JSON)
                             .content("""
                                     {
@@ -118,7 +118,7 @@ class SessionControllerIT extends BaseIntegrationTest {
 
         @Test
         void shouldReturn400WhenStudentStoppedAttending() throws Exception {
-            mockMvc.perform(put("/api/students/1")
+            mockMvc.perform(patch("/api/students/1")
                             .contentType(JSON)
                             .content("""
                                     { "stoppedAttending": true }

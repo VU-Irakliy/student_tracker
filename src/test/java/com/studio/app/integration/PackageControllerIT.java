@@ -24,6 +24,7 @@ class PackageControllerIT extends BaseIntegrationTest {
                                     {
                                       "totalClasses": 5,
                                       "amountPaid": 8000.00,
+                                      "currency": "RUBLES",
                                       "paymentDate": "2026-03-10",
                                       "description": "Mid-month top-up"
                                     }
@@ -63,6 +64,7 @@ class PackageControllerIT extends BaseIntegrationTest {
                                     {
                                       "totalClasses": 5,
                                       "amountPaid": 100.00,
+                                      "currency": "RUBLES",
                                       "paymentDate": "2026-03-12"
                                     }
                                     """))
@@ -75,6 +77,21 @@ class PackageControllerIT extends BaseIntegrationTest {
                             .contentType(JSON)
                             .content("""
                                     {
+                                      "amountPaid": 100.00,
+                                      "currency": "RUBLES",
+                                      "paymentDate": "2026-03-12"
+                                    }
+                                    """))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        void shouldReturn400_whenCurrencyMissing() throws Exception {
+            mockMvc.perform(post("/api/students/2/packages")
+                            .contentType(JSON)
+                            .content("""
+                                    {
+                                      "totalClasses": 5,
                                       "amountPaid": 100.00,
                                       "paymentDate": "2026-03-12"
                                     }

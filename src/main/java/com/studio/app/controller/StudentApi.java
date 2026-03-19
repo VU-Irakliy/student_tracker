@@ -71,7 +71,7 @@ public interface StudentApi {
      * @return the updated {@link StudentResponse}
      */
     @Operation(summary = "Update a student", description = "Partially updates a student. Only non-null fields are applied.")
-    @PutMapping("/{id}")
+    @PatchMapping("/{id}")
     ResponseEntity<StudentResponse> updateStudent(@PathVariable Long id, @Valid @RequestBody UpdateStudentRequest request);
 
     /**
