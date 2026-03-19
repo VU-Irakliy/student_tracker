@@ -75,7 +75,7 @@ public class ClassSessionServiceImpl implements ClassSessionService {
     @Transactional(readOnly = true)
     public List<ClassSessionResponse> getSessionsForStudent(Long studentId, LocalDate from, LocalDate to,
                                                             StudioTimezone viewerTimezone) {
-        findActiveStudent(studentId);
+        ensureActiveStudentExists(studentId);
 
         var sessions = (from != null && to != null)
                 ? sessionRepository.findByStudentIdAndDateRange(studentId, from, to)
@@ -138,8 +138,8 @@ public class ClassSessionServiceImpl implements ClassSessionService {
 
         if (!keepPaid) {
             // For package sessions: return class slot to the package
-            if (session.getPaymentStatus() == PaymentStatus.PACKAGE && session.getPackagePurchase() != null) {
-                var pkg = session.getPackagePurchase();
+            if (session.getPaymentStatus() == PaymentStatus.PACKAGE) {
+                var pkg = requireLinkedPackageForPackagePaidSession(session);
                 pkg.setClassesRemaining(pkg.getClassesRemaining() + 1);
                 packageRepository.save(pkg);
                 session.setPackagePurchase(null);
@@ -191,7 +191,7 @@ public class ClassSessionServiceImpl implements ClassSessionService {
     @Transactional(readOnly = true)
     public List<ClassSessionResponse> getSessionsByPaymentStatus(Long studentId, PaymentStatus paymentStatus,
                                                                  StudioTimezone viewerTimezone) {
-        findActiveStudent(studentId);
+        ensureActiveStudentExists(studentId);
         return sessionRepository.findByStudentIdAndPaymentStatusAndDeletedFalse(studentId, paymentStatus)
                 .stream().map(session -> toResponse(session, viewerTimezone)).toList();
     }
@@ -276,8 +276,8 @@ public class ClassSessionServiceImpl implements ClassSessionService {
                 .orElseThrow(() -> new ResourceNotFoundException("ClassSession", id));
     }
 
-    private Student findActiveStudent(Long studentId) {
-        return studentRepository.findByIdAndDeletedFalse(studentId)
+    private void ensureActiveStudentExists(Long studentId) {
+        studentRepository.findByIdAndDeletedFalse(studentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Student", studentId));
     }
 
@@ -295,7 +295,11 @@ public class ClassSessionServiceImpl implements ClassSessionService {
                     .stream()
                     .findFirst()
                     .orElseThrow(() -> new BadRequestException(
-                            "No active package with remaining classes found"));
+                            "Cannot mark session as paid: no active package assigned to student"));
+
+            if (pkg.getClassesRemaining() <= 0) {
+                throw new BadRequestException("Cannot mark session as paid: selected package has no remaining classes");
+            }
 
             pkg.setClassesRemaining(pkg.getClassesRemaining() - 1);
             packageRepository.save(pkg);
@@ -316,14 +320,22 @@ public class ClassSessionServiceImpl implements ClassSessionService {
         }
 
         // Return class to package if applicable
-        if (session.getPaymentStatus() == PaymentStatus.PACKAGE && session.getPackagePurchase() != null) {
-            var pkg = session.getPackagePurchase();
+        if (session.getPaymentStatus() == PaymentStatus.PACKAGE) {
+            var pkg = requireLinkedPackageForPackagePaidSession(session);
             pkg.setClassesRemaining(pkg.getClassesRemaining() + 1);
             packageRepository.save(pkg);
             session.setPackagePurchase(null);
         }
 
         session.setPaymentStatus(PaymentStatus.UNPAID);
+    }
+
+    private com.studio.app.entity.PackagePurchase requireLinkedPackageForPackagePaidSession(ClassSession session) {
+        var pkg = session.getPackagePurchase();
+        if (pkg == null) {
+            throw new BadRequestException("Session is marked as package-paid but has no linked package");
+        }
+        return pkg;
     }
 
     private void ensureStudentCanHaveSessionOnDate(Student student, LocalDate classDate) {

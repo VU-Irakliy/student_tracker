@@ -12,6 +12,7 @@ import com.studio.app.exception.BadRequestException;
 import com.studio.app.exception.ResourceNotFoundException;
 import com.studio.app.repository.ClassSessionRepository;
 import com.studio.app.repository.PackagePurchaseRepository;
+import com.studio.app.repository.StudentRepository;
 import com.studio.app.service.ClassSessionService;
 import com.studio.app.support.StubCurrencyTestConfig;
 import org.junit.jupiter.api.Test;
@@ -43,6 +44,9 @@ class ClassSessionServiceImplTest {
 
     @Autowired
     private PackagePurchaseRepository packageRepository;
+
+    @Autowired
+    private StudentRepository studentRepository;
 
     @Test
     void shouldCreateOneOffSessionWithStudentCurrencyAndTimezone() {
@@ -141,6 +145,29 @@ class ClassSessionServiceImplTest {
     }
 
     @Test
+    void shouldAllowCancelledSessionToRemainPaidForPerClassStudent() {
+        sessionService.cancelSession(12L, CancelSessionRequest.builder().keepAsPaid(true).build(), StudioTimezone.SPAIN);
+
+        var session = sessionRepository.findByIdAndDeletedFalse(12L).orElseThrow();
+        assertThat(session.getStatus()).isEqualTo(ClassStatus.CANCELLED);
+        assertThat(session.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
+    }
+
+    @Test
+    void shouldAllowCancelledSessionToRemainPaidForPackageStudent() {
+        var before = packageRepository.findByIdAndDeletedFalse(1L).orElseThrow();
+
+        sessionService.cancelSession(22L, CancelSessionRequest.builder().keepAsPaid(true).build(), StudioTimezone.SPAIN);
+
+        var session = sessionRepository.findByIdAndDeletedFalse(22L).orElseThrow();
+        var after = packageRepository.findByIdAndDeletedFalse(1L).orElseThrow();
+        assertThat(session.getStatus()).isEqualTo(ClassStatus.CANCELLED);
+        assertThat(session.getPaymentStatus()).isEqualTo(PaymentStatus.PACKAGE);
+        assertThat(session.getPackagePurchase()).isNotNull();
+        assertThat(after.getClassesRemaining()).isEqualTo(before.getClassesRemaining());
+    }
+
+    @Test
     void shouldMarkPackageStudentSessionAsPaidUsingOldestActivePackage() {
         sessionService.markSessionPaid(20L, PaySessionRequest.builder().build(), StudioTimezone.SPAIN);
 
@@ -149,6 +176,36 @@ class ClassSessionServiceImplTest {
         assertThat(session.getPaymentStatus()).isEqualTo(PaymentStatus.PACKAGE);
         assertThat(session.getPackagePurchase().getId()).isEqualTo(1L);
         assertThat(pkg.getClassesRemaining()).isEqualTo(7);
+    }
+
+    @Test
+    void shouldThrowWhenMarkingPackageStudentSessionPaidWithoutActivePackages() {
+        var packageStudent = studentRepository.findByIdAndDeletedFalse(2L).orElseThrow();
+        packageRepository.findByStudentIdAndDeletedFalseOrderByPaymentDateDesc(2L).forEach(pkg -> {
+            pkg.setClassesRemaining(0);
+            packageRepository.save(pkg);
+        });
+
+        assertThatThrownBy(() -> sessionService.markSessionPaid(20L, PaySessionRequest.builder().build(), StudioTimezone.SPAIN))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("no active package assigned");
+
+        // Sanity: dataset still points to PACKAGE student and session remains unpaid.
+        assertThat(packageStudent.getPricingType().name()).isEqualTo("PACKAGE");
+        assertThat(sessionRepository.findByIdAndDeletedFalse(20L).orElseThrow().getPaymentStatus())
+                .isEqualTo(PaymentStatus.UNPAID);
+    }
+
+    @Test
+    void shouldThrowWhenCancellingPackagePaymentWithoutLinkedPackage() {
+        var broken = sessionRepository.findByIdAndDeletedFalse(20L).orElseThrow();
+        broken.setPaymentStatus(PaymentStatus.PACKAGE);
+        broken.setPackagePurchase(null);
+        sessionRepository.save(broken);
+
+        assertThatThrownBy(() -> sessionService.cancelSessionPayment(20L, StudioTimezone.SPAIN))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("no linked package");
     }
 
 

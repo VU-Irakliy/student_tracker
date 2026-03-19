@@ -15,6 +15,10 @@ import org.springframework.web.bind.annotation.*;
 /**
  * REST API contract for single-session operations.
  * Provides endpoints to view, cancel, pay, cancel payment, and move payments on individual sessions.
+ *
+ * <p>Important: a cancelled session is allowed to remain paid when business rules require it.
+ * This applies to both PER_CLASS ({@code paymentStatus=PAID}) and PACKAGE
+ * ({@code paymentStatus=PACKAGE}) sessions.
  */
 @Tag(name = "Sessions", description = "Single-session operations: view, cancel, pay, and move payments")
 @RequestMapping(ApiConstants.SESSIONS)
@@ -48,6 +52,9 @@ public interface SessionApi {
 
     /**
      * Cancels a class session. Use {@code keepAsPaid} to retain payment or let it revert to unpaid.
+     *
+     * <p>When {@code keepAsPaid=true}, the session is cancelled but payment is intentionally kept.
+     * This is allowed for both PER_CLASS and PACKAGE students.
      *
      * @param sessionId the ID of the session to cancel
      * @param request   the cancellation options

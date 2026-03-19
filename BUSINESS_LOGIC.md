@@ -101,6 +101,11 @@ A student is assigned one of two pricing types at creation time (changeable via 
 Sessions are created with `status=SCHEDULED` and `paymentStatus=UNPAID`.  
 There is no automatic status transition — status/payment changes are manual.
 
+Supported paid-on-cancelled combinations:
+- `status=CANCELLED` + `paymentStatus=PAID` is valid for **PER_CLASS** students.
+- `status=CANCELLED` + `paymentStatus=PACKAGE` is valid for **PACKAGE** students.
+- These combinations are intentional (for example, late cancellation that is still charged).
+
 Supported manual actions:
 - `PUT /api/sessions/{id}` — unified partial update (date/time/duration/status/payment toggle/note)
 - `POST /api/sessions/{id}/completion?completed=true|false` — sets `status` to `COMPLETED` or `SCHEDULED`
@@ -174,6 +179,9 @@ POST /api/sessions/{id}/cancel
 - `status` → `CANCELLED`
 - `paymentStatus` stays `UNPAID` (no change — nothing to release)
 - No package is affected
+
+> Note: `CANCELLED` sessions are still allowed to remain paid when cancellation is done with
+> `keepAsPaid: true` (both `PAID` and `PACKAGE` are supported).
 
 ---
 
