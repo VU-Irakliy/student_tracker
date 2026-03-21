@@ -1,129 +1,128 @@
 package com.studio.app.service.impl;
 
-import com.studio.app.entity.Student;
-import com.studio.app.enums.PricingType;
-import com.studio.app.enums.StudioTimezone;
-import com.studio.app.repository.ClassSessionRepository;
 import com.studio.app.repository.StudentRepository;
+import com.studio.app.service.DebtorStatusService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.jdbc.Sql;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
-import java.util.List;
 
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
-@ExtendWith(MockitoExtension.class)
+@SpringBootTest
+@ActiveProfiles("test")
+@Sql(scripts = "/cleanup-test.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
+@Sql(scripts = "/testdata/service/debtor/seed.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
+@Sql(scripts = "/cleanup-test.sql", executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
 class DebtorStatusServiceImplTest {
 
-    @Mock
+    @Autowired
+    private DebtorStatusService debtorStatusService;
+
+    @Autowired
     private StudentRepository studentRepository;
 
-    @Mock
-    private ClassSessionRepository classSessionRepository;
-
-    private Student spainStudent;
-    private Student moscowStudent;
+    @Autowired
+    private MutableClock mutableClock;
 
     @BeforeEach
-    void setUp() {
-        spainStudent = Student.builder()
-                .id(1L)
-                .firstName("Ana")
-                .lastName("Garcia")
-                .pricingType(PricingType.PER_CLASS)
-                .timezone(StudioTimezone.SPAIN)
-                .debtor(false)
-                .build();
-
-        moscowStudent = Student.builder()
-                .id(2L)
-                .firstName("Ivan")
-                .lastName("Petrov")
-                .pricingType(PricingType.PACKAGE)
-                .timezone(StudioTimezone.RUSSIA_MOSCOW)
-                .debtor(false)
-                .build();
+    void resetClock() {
+        mutableClock.setInstant(Instant.parse("2026-03-15T22:30:00Z"));
     }
 
     @Test
     void shouldProcessOnlyStudentsWhoseLocalTimeIsAfter22() {
         // 20:30 UTC => 21:30 in Spain, 23:30 in Moscow
-        var clock = Clock.fixed(Instant.parse("2026-03-15T20:30:00Z"), ZoneOffset.UTC);
-        var service = new DebtorStatusServiceImpl(studentRepository, classSessionRepository, clock);
+        mutableClock.setInstant(Instant.parse("2026-03-15T20:30:00Z"));
 
-        when(studentRepository.findAllByDeletedFalse()).thenReturn(List.of(spainStudent, moscowStudent));
-        when(classSessionRepository.existsUnpaidOccurredSessionForStudent(
-                eq(2L), eq(LocalDate.of(2026, 3, 15)), any(java.time.LocalTime.class)))
-                .thenReturn(true);
+        debtorStatusService.refreshDebtorStatuses();
 
-        service.refreshDebtorStatuses();
+        var spainStudent = studentRepository.findByIdAndDeletedFalse(1L).orElseThrow();
+        var moscowStudent = studentRepository.findByIdAndDeletedFalse(2L).orElseThrow();
 
-        verify(classSessionRepository, never())
-                .existsUnpaidOccurredSessionForStudent(eq(1L), any(LocalDate.class), any(java.time.LocalTime.class));
-        verify(classSessionRepository)
-                .existsUnpaidOccurredSessionForStudent(eq(2L), eq(LocalDate.of(2026, 3, 15)), any(java.time.LocalTime.class));
-        verify(studentRepository).saveAll(anyList());
+        assertThat(spainStudent.isDebtor()).isFalse();
+        assertThat(moscowStudent.isDebtor()).isTrue();
     }
 
     @Test
     void shouldClearDebtorWhenAllUnpaidSessionsAreResolved() {
-        var clock = Clock.fixed(Instant.parse("2026-03-15T22:30:00Z"), ZoneOffset.UTC);
-        var service = new DebtorStatusServiceImpl(studentRepository, classSessionRepository, clock);
+        var debtorStudent = studentRepository.findByIdAndDeletedFalse(3L).orElseThrow();
+        assertThat(debtorStudent.isDebtor()).isTrue();
 
-        spainStudent.setDebtor(true);
-        when(studentRepository.findAllByDeletedFalse()).thenReturn(List.of(spainStudent));
-        when(classSessionRepository.existsUnpaidOccurredSessionForStudent(
-                eq(1L), eq(LocalDate.of(2026, 3, 15)), any(java.time.LocalTime.class)))
-                .thenReturn(false);
+        debtorStatusService.refreshDebtorStatuses();
 
-        service.refreshDebtorStatuses();
-
-        verify(studentRepository).saveAll(anyList());
+        debtorStudent = studentRepository.findByIdAndDeletedFalse(3L).orElseThrow();
+        assertThat(debtorStudent.isDebtor()).isFalse();
     }
 
     @Test
-    void shouldNotSaveWhenNoDebtorFlagsChange() {
-        var clock = Clock.fixed(Instant.parse("2026-03-15T22:30:00Z"), ZoneOffset.UTC);
-        var service = new DebtorStatusServiceImpl(studentRepository, classSessionRepository, clock);
+    void shouldNotChangeFlagsWhenAlreadyCorrect() {
+        var studentBefore = studentRepository.findByIdAndDeletedFalse(4L).orElseThrow();
+        assertThat(studentBefore.isDebtor()).isFalse();
 
-        when(studentRepository.findAllByDeletedFalse()).thenReturn(List.of(spainStudent));
-        when(classSessionRepository.existsUnpaidOccurredSessionForStudent(
-                eq(1L), eq(LocalDate.of(2026, 3, 15)), any(java.time.LocalTime.class)))
-                .thenReturn(false);
+        debtorStatusService.refreshDebtorStatuses();
 
-        service.refreshDebtorStatuses();
-
-        verify(studentRepository, never()).saveAll(anyList());
+        var studentAfter = studentRepository.findByIdAndDeletedFalse(4L).orElseThrow();
+        assertThat(studentAfter.isDebtor()).isFalse();
     }
 
     @Test
     void shouldBypassCutoffWhenRequestedForStartupCatchUp() {
         // 20:30 UTC => 21:30 in Spain (before nightly cutoff)
-        var clock = Clock.fixed(Instant.parse("2026-03-15T20:30:00Z"), ZoneOffset.UTC);
-        var service = new DebtorStatusServiceImpl(studentRepository, classSessionRepository, clock);
+        mutableClock.setInstant(Instant.parse("2026-03-15T20:30:00Z"));
 
-        when(studentRepository.findAllByDeletedFalse()).thenReturn(List.of(spainStudent));
-        when(classSessionRepository.existsUnpaidOccurredSessionForStudent(
-                eq(1L), eq(LocalDate.of(2026, 3, 15)), any(java.time.LocalTime.class)))
-                .thenReturn(true);
+        debtorStatusService.refreshDebtorStatuses(true);
 
-        service.refreshDebtorStatuses(true);
+        var spainStudent = studentRepository.findByIdAndDeletedFalse(1L).orElseThrow();
+        assertThat(spainStudent.isDebtor()).isTrue();
+    }
 
-        verify(classSessionRepository)
-                .existsUnpaidOccurredSessionForStudent(eq(1L), eq(LocalDate.of(2026, 3, 15)), any(java.time.LocalTime.class));
-        verify(studentRepository).saveAll(anyList());
+    @TestConfiguration
+    static class DebtorClockConfig {
+
+        @Bean
+        @Primary
+        MutableClock mutableClock() {
+            return new MutableClock(Instant.parse("2026-03-15T22:30:00Z"), ZoneOffset.UTC);
+        }
+    }
+
+    static final class MutableClock extends Clock {
+        private Instant instant;
+        private final ZoneId zone;
+
+        MutableClock(Instant instant, ZoneId zone) {
+            this.instant = instant;
+            this.zone = zone;
+        }
+
+        void setInstant(Instant instant) {
+            this.instant = instant;
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return zone;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return new MutableClock(instant, zone);
+        }
+
+        @Override
+        public Instant instant() {
+            return instant;
+        }
     }
 }
-
-
-

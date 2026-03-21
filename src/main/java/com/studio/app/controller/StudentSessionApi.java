@@ -4,6 +4,7 @@ import com.studio.app.constant.ApiConstants;
 import com.studio.app.dto.request.OneOffSessionRequest;
 import com.studio.app.dto.response.ClassSessionResponse;
 import com.studio.app.enums.PaymentStatus;
+import com.studio.app.enums.StudioTimezone;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -33,7 +34,8 @@ public interface StudentSessionApi {
             description = "Creates an extra or rescheduled class for a student outside their regular weekly schedule.")
     @PostMapping("/{studentId}/sessions")
     ResponseEntity<ClassSessionResponse> createOneOffSession(@PathVariable Long studentId,
-                                                              @Valid @RequestBody OneOffSessionRequest request);
+                                                              @Valid @RequestBody OneOffSessionRequest request,
+                                                              @RequestParam(defaultValue = "SPAIN") StudioTimezone timezone);
 
     /**
      * Returns all sessions for a student, optionally filtered by a date range.
@@ -49,7 +51,8 @@ public interface StudentSessionApi {
     ResponseEntity<List<ClassSessionResponse>> getSessionsForStudent(
             @PathVariable Long studentId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to);
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "SPAIN") StudioTimezone timezone);
 
     /**
      * Returns sessions for a student filtered by payment status.
@@ -62,5 +65,6 @@ public interface StudentSessionApi {
             description = "Returns sessions for a student filtered by payment status: PAID, UNPAID, PACKAGE, or REFUNDED.")
     @GetMapping("/{studentId}/sessions/by-payment")
     ResponseEntity<List<ClassSessionResponse>> getSessionsByPayment(@PathVariable Long studentId,
-                                                                     @RequestParam PaymentStatus paymentStatus);
+                                                                     @RequestParam PaymentStatus paymentStatus,
+                                                                     @RequestParam(defaultValue = "SPAIN") StudioTimezone timezone);
 }

@@ -3,8 +3,12 @@ package com.studio.app.service.impl;
 import com.studio.app.dto.request.CreateStudentRequest;
 import com.studio.app.dto.request.UpdateStudentRequest;
 import com.studio.app.dto.response.StudentResponse;
+import com.studio.app.enums.ClassStatus;
+import com.studio.app.enums.Currency;
 import com.studio.app.entity.Student;
+import com.studio.app.enums.PricingType;
 import com.studio.app.enums.StudentClassType;
+import com.studio.app.exception.BadRequestException;
 import com.studio.app.exception.ResourceNotFoundException;
 import com.studio.app.mapper.StudentMapper;
 import com.studio.app.repository.ClassSessionRepository;
@@ -17,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -29,6 +34,8 @@ import java.util.Optional;
 @Transactional
 public class StudentServiceImpl implements StudentService {
 
+    private static final String HOLIDAY_AUTO_NOTE_PREFIX = "[AUTO_HOLIDAY]";
+
     private final StudentRepository studentRepository;
     private final WeeklyScheduleRepository weeklyScheduleRepository;
     private final ClassSessionRepository classSessionRepository;
@@ -39,6 +46,8 @@ public class StudentServiceImpl implements StudentService {
     /** {@inheritDoc} */
     @Override
     public StudentResponse createStudent(CreateStudentRequest request) {
+        validateCreateStudentRequest(request);
+
         var student = Student.builder()
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
@@ -48,6 +57,11 @@ public class StudentServiceImpl implements StudentService {
                 .currency(request.getCurrency())
                 .timezone(request.getTimezone())
                 .classType(Optional.ofNullable(request.getClassType()).orElse(StudentClassType.CASUAL))
+                .startDate(request.getStartDate())
+                .holidayMode(Boolean.TRUE.equals(request.getHolidayMode()))
+                .holidayFrom(request.getHolidayFrom())
+                .holidayTo(request.getHolidayTo())
+                .stoppedAttending(Boolean.TRUE.equals(request.getStoppedAttending()))
                 .notes(request.getNotes())
                 .build();
 
@@ -79,11 +93,15 @@ public class StudentServiceImpl implements StudentService {
         Optional.ofNullable(request.getLastName()).ifPresent(student::setLastName);
         Optional.ofNullable(request.getPhoneNumber()).ifPresent(student::setPhoneNumber);
         Optional.ofNullable(request.getPricingType()).ifPresent(student::setPricingType);
-        Optional.ofNullable(request.getPricePerClass()).ifPresent(student::setPricePerClass);
-        Optional.ofNullable(request.getCurrency()).ifPresent(student::setCurrency);
+        applyPricingFieldUpdates(student, request);
         Optional.ofNullable(request.getTimezone()).ifPresent(student::setTimezone);
         Optional.ofNullable(request.getClassType()).ifPresent(student::setClassType);
+        Optional.ofNullable(request.getStartDate()).ifPresent(student::setStartDate);
+        applyStoppedAttendingUpdate(student, request.getStoppedAttending());
         Optional.ofNullable(request.getNotes()).ifPresent(student::setNotes);
+
+        applyHolidayStateUpdate(student, request);
+        validateUpdatedStudentState(student);
 
         return toResponse(studentRepository.save(student));
     }
@@ -105,7 +123,6 @@ public class StudentServiceImpl implements StudentService {
                 .filter(session -> session.getClassDate().isAfter(today))
                 .forEach(session -> session.setDeleted(true));
 
-        // Soft-delete all payers
         payerRepository.findByStudentIdAndDeletedFalse(id)
                 .forEach(payer -> payer.setDeleted(true));
 
@@ -122,12 +139,16 @@ public class StudentServiceImpl implements StudentService {
                 .toList();
     }
 
-    // ── helpers ─────────────────────────────────────────────────────────────
 
     private StudentResponse toResponse(Student student) {
         var response = studentMapper.toResponse(student);
-        // Keep classType explicit in case generated mapper code is stale in local IDE caches.
+
         response.setClassType(student.getClassType());
+        response.setStartDate(student.getStartDate());
+        response.setHolidayMode(student.isHolidayMode());
+        response.setHolidayFrom(student.getHolidayFrom());
+        response.setHolidayTo(student.getHolidayTo());
+        response.setStoppedAttending(student.isStoppedAttending());
         return enrichWithConvertedPrices(response);
     }
 
@@ -147,5 +168,158 @@ public class StudentServiceImpl implements StudentService {
     private Student findActiveStudent(Long id) {
         return studentRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Student", id));
+    }
+
+    private void validateCreateStudentRequest(CreateStudentRequest request) {
+        validateFullName(request.getFirstName(), request.getLastName());
+        validatePricingRules(request.getPricingType(), request.getPricePerClass(), request.getCurrency());
+
+        if (Boolean.TRUE.equals(request.getHolidayMode()) && request.getHolidayFrom() == null) {
+            throw new BadRequestException("holidayFrom is required when holidayMode is true");
+        }
+        if (request.getHolidayTo() != null && request.getHolidayFrom() == null) {
+            throw new BadRequestException("holidayFrom is required when holidayTo is provided");
+        }
+        if (request.getHolidayFrom() != null && request.getHolidayTo() != null
+                && request.getHolidayTo().isBefore(request.getHolidayFrom())) {
+            throw new BadRequestException("holidayTo must be on or after holidayFrom");
+        }
+    }
+
+    private void validateUpdatedStudentState(Student student) {
+        validateFullName(student.getFirstName(), student.getLastName());
+        validatePricingRules(student.getPricingType(), student.getPricePerClass(), student.getCurrency());
+
+        if (student.getHolidayTo() != null && student.getHolidayFrom() == null) {
+            throw new BadRequestException("holidayFrom is required when holidayTo is provided");
+        }
+    }
+
+    private void validateFullName(String firstName, String lastName) {
+        if (firstName == null || firstName.isBlank() || lastName == null || lastName.isBlank()) {
+            throw new BadRequestException("firstName and lastName are required");
+        }
+    }
+
+    private void validatePricingRules(PricingType pricingType, BigDecimal pricePerClass, Currency currency) {
+        if (pricingType == PricingType.PER_CLASS && pricePerClass == null) {
+            throw new BadRequestException("pricePerClass is required when pricingType is PER_CLASS");
+        }
+        if (pricingType == PricingType.PACKAGE && (pricePerClass != null || currency != null)) {
+            throw new BadRequestException("pricePerClass and currency must be null when pricingType is PACKAGE");
+        }
+        if (pricePerClass != null && currency == null) {
+            throw new BadRequestException("currency is required when pricePerClass is provided");
+        }
+    }
+
+    private void applyHolidayStateUpdate(Student student, UpdateStudentRequest request) {
+        Optional.ofNullable(request.getHolidayFrom()).ifPresent(student::setHolidayFrom);
+        Optional.ofNullable(request.getHolidayTo()).ifPresent(student::setHolidayTo);
+
+        if (request.getHolidayMode() != null) {
+            if (request.getHolidayMode()) {
+                var holidayFrom = Optional.ofNullable(request.getHolidayFrom()).orElse(student.getHolidayFrom());
+                if (holidayFrom == null) {
+                    throw new BadRequestException("holidayFrom is required when holidayMode is true");
+                }
+                student.setHolidayMode(true);
+                student.setHolidayFrom(holidayFrom);
+                student.setHolidayTo(null);
+                autoCancelSessionsForHoliday(student.getId(), holidayFrom);
+                return;
+            }
+
+            if (!student.isHolidayMode()) {
+                throw new BadRequestException("Student is not currently on holiday");
+            }
+            var returnDate = request.getHolidayTo();
+            if (returnDate == null) {
+                throw new BadRequestException("holidayTo is required when holidayMode is set to false");
+            }
+            if (student.getHolidayFrom() != null && returnDate.isBefore(student.getHolidayFrom())) {
+                throw new BadRequestException("holidayTo must be on or after holidayFrom");
+            }
+
+            student.setHolidayMode(false);
+            student.setHolidayTo(returnDate);
+            restoreAutoCancelledSessionsFrom(student.getId(), returnDate);
+            return;
+        }
+
+        if (student.getHolidayFrom() != null && student.getHolidayTo() != null
+                && student.getHolidayTo().isBefore(student.getHolidayFrom())) {
+            throw new BadRequestException("holidayTo must be on or after holidayFrom");
+        }
+    }
+
+    private void applyPricingFieldUpdates(Student student, UpdateStudentRequest request) {
+        if (request.getPricingType() == PricingType.PACKAGE) {
+            // PACKAGE pricing is tracked per purchase, not on the student profile.
+            student.setPricePerClass(null);
+            student.setCurrency(null);
+            return;
+        }
+
+        // Nulls are treated as "no change" for partial updates.
+        if (request.getPricePerClass() != null) {
+            student.setPricePerClass(request.getPricePerClass());
+        }
+        if (request.getCurrency() != null) {
+            student.setCurrency(request.getCurrency());
+        }
+    }
+
+    private void autoCancelSessionsForHoliday(Long studentId, LocalDate holidayFrom) {
+        var sessionsToCancel = classSessionRepository
+                .findByStudentIdAndDeletedFalseOrderByClassDateAscStartTimeAsc(studentId)
+                .stream()
+                .filter(session -> !session.getClassDate().isBefore(holidayFrom))
+                .filter(session -> session.getStatus() != ClassStatus.CANCELLED)
+                .toList();
+
+        sessionsToCancel.forEach(session -> {
+            session.setStatus(ClassStatus.CANCELLED);
+            session.setNote(HOLIDAY_AUTO_NOTE_PREFIX + " Cancelled due to student holiday");
+        });
+        classSessionRepository.saveAll(sessionsToCancel);
+    }
+
+    private void restoreAutoCancelledSessionsFrom(Long studentId, LocalDate returnDate) {
+        var sessionsToRestore = classSessionRepository
+                .findByStudentIdAndDeletedFalseOrderByClassDateAscStartTimeAsc(studentId)
+                .stream()
+                .filter(session -> !session.getClassDate().isBefore(returnDate))
+                .filter(session -> session.getStatus() == ClassStatus.CANCELLED)
+                .filter(session -> session.getNote() != null && session.getNote().startsWith(HOLIDAY_AUTO_NOTE_PREFIX))
+                .toList();
+
+        sessionsToRestore.forEach(session -> {
+            session.setStatus(ClassStatus.SCHEDULED);
+            session.setNote(null);
+        });
+        classSessionRepository.saveAll(sessionsToRestore);
+    }
+
+    private void applyStoppedAttendingUpdate(Student student, Boolean stoppedAttending) {
+        if (stoppedAttending == null) {
+            return;
+        }
+
+        boolean wasStopped = student.isStoppedAttending();
+        student.setStoppedAttending(stoppedAttending);
+
+        if (!wasStopped && stoppedAttending) {
+            softDeleteSessionsFromCurrentDate(student.getId());
+        }
+    }
+
+    private void softDeleteSessionsFromCurrentDate(Long studentId) {
+        LocalDate today = LocalDate.now();
+        classSessionRepository
+                .findByStudentIdAndDeletedFalseOrderByClassDateAscStartTimeAsc(studentId)
+                .stream()
+                .filter(session -> session.getClassDate().isAfter(today))
+                .forEach(session -> session.setDeleted(true));
     }
 }

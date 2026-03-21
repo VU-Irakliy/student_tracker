@@ -16,7 +16,12 @@ public interface ClassSessionMapper {
     @Mapping(target = "studentId",       source = "student.id")
     @Mapping(target = "studentName",     expression = "java(session.getStudent().getFirstName() + \" \" + session.getStudent().getLastName())")
     @Mapping(target = "packagePurchaseId", source = "packagePurchase.id")
+    @Mapping(target = "timezone", source = "timezone")
     @Mapping(target = "convertedPrices", ignore = true)
+    @Mapping(target = "originalClassDate", ignore = true)
+    @Mapping(target = "originalStartTime", ignore = true)
+    @Mapping(target = "originalTimezone", ignore = true)
+    @Mapping(target = "viewerTimezone", ignore = true)
     ClassSessionResponse toResponse(ClassSession session);
 
     List<ClassSessionResponse> toResponseList(List<ClassSession> sessions);

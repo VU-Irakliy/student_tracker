@@ -20,6 +20,14 @@ public interface ClassSessionRepository extends JpaRepository<ClassSession, Long
     /** All non-deleted sessions for a student ordered by date and time. */
     List<ClassSession> findByStudentIdAndDeletedFalseOrderByClassDateAscStartTimeAsc(Long studentId);
 
+    /** Non-deleted sessions for a student from the given date (inclusive). */
+    List<ClassSession> findByStudentIdAndClassDateGreaterThanEqualAndDeletedFalseOrderByClassDateAscStartTimeAsc(
+            Long studentId, LocalDate from);
+
+    /** Non-deleted sessions for a student up to the given date (inclusive). */
+    List<ClassSession> findByStudentIdAndClassDateLessThanEqualAndDeletedFalseOrderByClassDateAscStartTimeAsc(
+            Long studentId, LocalDate to);
+
     /** Non-deleted sessions for a student within an inclusive date range. */
     @Query("""
             SELECT cs FROM ClassSession cs

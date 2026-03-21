@@ -2,6 +2,7 @@ package com.studio.app.controller;
 
 import com.studio.app.constant.ApiConstants;
 import com.studio.app.dto.response.CalendarDayResponse;
+import com.studio.app.enums.StudioTimezone;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -37,5 +38,6 @@ public interface CalendarApi {
     @GetMapping
     ResponseEntity<List<CalendarDayResponse>> getCalendar(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to);
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "SPAIN") StudioTimezone timezone);
 }

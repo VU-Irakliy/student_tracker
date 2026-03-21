@@ -8,6 +8,7 @@ import jakarta.validation.constraints.DecimalMin;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 /**
  * Request body for updating an existing student.
@@ -44,6 +45,21 @@ public class UpdateStudentRequest {
 
     /** Updated class program type for the student. */
     private StudentClassType classType;
+
+    /** Updated class start date for the student. */
+    private LocalDate startDate;
+
+    /** Updated holiday toggle. {@code true}=on holiday, {@code false}=back from holiday. */
+    private Boolean holidayMode;
+
+    /** Updated holiday start date (inclusive). */
+    private LocalDate holidayFrom;
+
+    /** Updated return date when student is back from holiday. */
+    private LocalDate holidayTo;
+
+    /** Updated stopped-attending flag. */
+    private Boolean stoppedAttending;
 
     /** Updated internal notes visible to teacher/admin. */
     private String notes;

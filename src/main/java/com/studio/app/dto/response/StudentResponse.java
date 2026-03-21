@@ -7,6 +7,7 @@ import com.studio.app.enums.StudioTimezone;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -56,6 +57,21 @@ public class StudentResponse {
 
     /** Program type this student attends. */
     private StudentClassType classType;
+
+    /** Date from which this student can start having classes. */
+    private LocalDate startDate;
+
+    /** True while the student is on holiday. */
+    private boolean holidayMode;
+
+    /** First holiday day (inclusive). */
+    private LocalDate holidayFrom;
+
+    /** Day the student returns from holiday (inclusive). */
+    private LocalDate holidayTo;
+
+    /** True when student stopped attending but remains visible in lists. */
+    private boolean stoppedAttending;
 
     /** Optional internal notes visible to teacher/admin. */
     private String notes;

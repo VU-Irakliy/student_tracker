@@ -30,7 +30,8 @@ public class PackagePurchaseRequest {
     @DecimalMin(value = "0.00", message = "Amount paid cannot be negative")
     private BigDecimal amountPaid;
 
-    /** Optional currency override. Defaults to the student's currency if not provided. */
+    /** Currency used for this package purchase. */
+    @NotNull(message = "Currency is required")
     private Currency currency;
 
     /** Date the package payment was received. */

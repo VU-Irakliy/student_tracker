@@ -49,6 +49,7 @@ src/main/java/com/studio/app/
 │   ├── PackageApi.java                  # /api/packages/{id}
 │   ├── CalendarApi.java                 # /api/calendar
 │   ├── EarningsApi.java                 # /api/earnings
+│   ├── DataPortabilityApi.java          # /api/data
 │   └── impl/                            # Controller implementations
 │       ├── StudentController.java
 │       ├── ScheduleController.java
@@ -58,7 +59,8 @@ src/main/java/com/studio/app/
 │       ├── SessionController.java
 │       ├── PackageController.java
 │       ├── CalendarController.java
-│       └── EarningsController.java
+│       ├── EarningsController.java
+│       └── DataPortabilityController.java
 ├── service/
 │   ├── StudentService.java
 │   ├── ScheduleService.java
@@ -66,6 +68,7 @@ src/main/java/com/studio/app/
 │   ├── PackageService.java
 │   ├── PayerService.java
 │   ├── EarningsService.java
+│   ├── DataPortabilityService.java
 │   ├── CurrencyConversionService.java
 │   └── impl/                            # Service implementations
 ├── repository/                          # JpaRepository interfaces
@@ -94,12 +97,13 @@ src/main/resources/
 └── logback-spring.xml                   # logging (console + Desktop error file)
 
 db/
-├── init/                                # auto-run on first Docker startup
+├── init/                                # additive SQL migrations
 │   ├── 00_create_schema.sql
 │   ├── 01_create_tables.sql
 │   ├── 02_create_indexes.sql
-│   └── 03–06_*.sql                      # additive migrations
+│   └── 03+_*.sql                        # additive migrations
 ├── scripts/
+│   ├── apply-pending-init.sh            # container-native auto migration runner
 │   ├── backup.ps1
 │   └── restore.ps1
 └── backups/                             # dump output directory (git-ignored)
@@ -115,17 +119,17 @@ db/
 docker compose up -d
 ```
 
-On **first startup** (empty `pgdata/`) the SQL scripts in `db/init/` automatically create
-the `studio` schema, all tables, and indexes. Data is persisted in `pgdata/` (git-ignored).
+On **first startup** (empty `pgdata/`) PostgreSQL initializes from `db/init/`.
+On every next `docker compose up -d`, the `db-migrator` service checks `db/init/*.sql`
+in filename order and applies only scripts missing from `studio.schema_migration_history`.
 
-For existing databases, run the startup helper script to automate migration checks:
+If you prefer using the helper script:
 
 ```powershell
 .\db\scripts\start-db.ps1
 ```
 
-It starts PostgreSQL, checks `studio.schema_migration_history`, runs only pending
-`db/init/*.sql` scripts in filename order, and records each applied script.
+It starts PostgreSQL plus `db-migrator`, so pending scripts are applied automatically.
 
 ```bash
 docker compose down        # stop (keeps data)
@@ -193,15 +197,11 @@ The SQL init scripts are the single source of truth.
 
 The restore runs inside a single transaction — if anything fails, nothing changes.
 
-### Apply Pending Init Scripts Manually
+### Migration Notes
 
-If you want to trigger migration checks manually:
-
-```powershell
-.\db\scripts\apply-pending-init.ps1
-```
-
-The script skips already-applied files using `studio.schema_migration_history`.
+`studio.schema_migration_history` prevents re-running the same script.
+If a previously applied file is edited, `db-migrator` logs that checksum differs and skips it,
+so the safe path is still to add changes as a new SQL file.
 
 ---
 
@@ -246,7 +246,7 @@ cached value is used as a fallback.
 | POST   | `/api/students`             | Create a student                   |
 | GET    | `/api/students`             | List all; `?search=name` to filter |
 | GET    | `/api/students/{id}`        | Get one student                    |
-| PUT    | `/api/students/{id}`        | Update student (partial)           |
+| PATCH  | `/api/students/{id}`        | Update student (partial)           |
 | DELETE | `/api/students/{id}`        | Soft-delete student + related data |
 
 **Create / update body (all fields optional on update):**
@@ -260,6 +260,11 @@ cached value is used as a fallback.
   "currency": "EUROS",
   "timezone": "SPAIN",
   "classType": "CASUAL",
+  "startDate": "2026-03-01",
+  "holidayMode": false,
+  "holidayFrom": null,
+  "holidayTo": null,
+  "stoppedAttending": false,
   "notes": "Prefers morning classes"
 }
 ```
@@ -268,7 +273,21 @@ cached value is used as a fallback.
 `timezone`: `SPAIN` | `RUSSIA_MOSCOW`
 `classType`: `CASUAL` | `EGE` | `OGE` | `IELTS` | `TOFEL`
 
+Partial update semantics:
+- sending `null` for `pricePerClass` and/or `currency` keeps existing stored values unchanged.
+- exception: when `pricingType` is set to `PACKAGE`, the backend always clears student `pricePerClass` and `currency`.
+
+Pricing invariants:
+- `PER_CLASS`: `pricePerClass` is required; `currency` is required when `pricePerClass` is provided.
+- `PACKAGE`: student-level `pricePerClass` and `currency` must be `null`; package purchase stores payment amount/currency.
+
 Student responses also include `debtor` (boolean), maintained by the debtor batch process.
+
+Lifecycle fields:
+- `startDate` blocks creating classes before that date.
+- `holidayMode=true` requires `holidayFrom`; classes are auto-cancelled from that date.
+- turning holiday off requires `holidayTo` (return date), and auto-cancelled future sessions from that day are restored.
+- `stoppedAttending=true` keeps student visible but blocks new sessions/schedule edits.
 
 ---
 
@@ -312,6 +331,12 @@ Student responses also include `debtor` (boolean), maintained by the debtor batc
 | GET    | `/api/students/{id}/sessions`                | All sessions; `?from=&to=` date filter           |
 | GET    | `/api/students/{id}/sessions/by-payment`     | Filter by `?paymentStatus=PAID\|UNPAID\|PACKAGE` |
 
+One-off creation now validates student availability: date must be on/after `startDate`, student must not be in active holiday mode, and must not be marked as stopped attending.
+
+Student-scoped list behaviour:
+- if student does not exist (or is soft-deleted), `GET /sessions` and `GET /sessions/by-payment` return `404`.
+- date filtering supports full range (`from` + `to`) and single-sided filters (`from` only or `to` only).
+
 ```json
 {
   "classDate": "2026-04-20",
@@ -331,7 +356,6 @@ Student responses also include `debtor` (boolean), maintained by the debtor batc
 | POST   | `/api/sessions/{id}/pay`                | Mark as paid (auto-deducts from active package for PACKAGE type) |
 | POST   | `/api/sessions/{id}/completion`         | Set completion state via `?completed=true\|false`               |
 | POST   | `/api/sessions/{id}/cancel-payment`     | Revert payment (→ UNPAID or return slot to package)              |
-| POST   | `/api/sessions/{id}/move-payment`       | Move payment to another session                                  |
 
 **Cancel:**
 ```json
@@ -362,11 +386,6 @@ POST /api/sessions/{id}/completion?completed=true
 POST /api/sessions/{id}/completion?completed=false
 ```
 
-**Move payment:**
-```json
-{ "targetSessionId": 42 }
-```
-
 ---
 
 ### Packages — `/api/students/{studentId}/packages`
@@ -389,7 +408,7 @@ POST /api/sessions/{id}/completion?completed=false
 ```
 
 > `amountPaid` is what the student actually paid — it can be any negotiated amount.  
-> `currency` defaults to the student's own currency if omitted.
+> Required fields: `totalClasses`, `amountPaid`, `currency`, `paymentDate`.
 
 ---
 
@@ -434,12 +453,35 @@ To get **weekly earnings**, call `/api/earnings/daily` with any 7-day range.
 
 ---
 
+### Data Portability — `/api/data`
+
+| Method | Path                | Description                                               |
+|--------|---------------------|-----------------------------------------------------------|
+| GET    | `/api/data/export`      | Download full data snapshot file (compressed JSON GZIP) |
+| POST   | `/api/data/import`      | Replace current data with `.json.gz` bytes or plain JSON |
+| POST   | `/api/data/import-file` | Replace current data using uploaded snapshot file      |
+
+Use this when deploying a new app version into a fresh database and you need to move data from the old instance.
+
+Recommended flow:
+1. Call `GET /api/data/export` on the old environment and save the `.json.gz` file.
+2. Start the new environment with an empty DB.
+3. Import using one of:
+   - `POST /api/data/import` with the downloaded file content directly
+   - `POST /api/data/import-file` with multipart file upload
+
+Exported file name format:
+- `student-mgmt-export-YYYYMMDD_HHMMSS-utc.json.gz`
+- Example: `student-mgmt-export-20260315_184530-utc.json.gz`
+
+---
+
 ## Business Rules Summary
 
 | Scenario                                | Behaviour                                                                                  |
 |-----------------------------------------|--------------------------------------------------------------------------------------------|
 | Cancel + keep as paid                   | `status=CANCELLED`, payment status unchanged, package slot NOT returned                    |
-| Cancel + release payment (PER_CLASS)    | `paymentStatus=UNPAID`; use `/move-payment` to reassign to another session                 |
+| Cancel + release payment (PER_CLASS)    | `paymentStatus=UNPAID`; then mark target session as paid (optionally with `amountOverride`) |
 | Cancel + release payment (PACKAGE)      | Package slot returned (`classesRemaining + 1`); session unlinked from package              |
 | Cancel already-cancelled session        | `400 Bad Request`                                                                          |
 | Cancel payment on UNPAID session        | `400 Bad Request`                                                                          |
@@ -448,7 +490,6 @@ To get **weekly earnings**, call `/api/earnings/daily` with any 7-day range.
 | Pay already-paid session                | `400 Bad Request`                                                                          |
 | Set completion state                    | `/completion?completed=true\|false` switches `status` between `COMPLETED` and `SCHEDULED` |
 | Unified session update                  | `PUT /api/sessions/{id}` can update schedule fields, status, payment toggle, and note     |
-| Move payment (source must be PAID)      | Source → `UNPAID`, target → `PAID`, price transferred                                     |
 | Student soft-delete                     | Student + schedules + payers soft-deleted; only **future** sessions deleted, past kept     |
 | Debtor status                           | After 22:00 local time, students with already-happened `UNPAID` sessions are marked debtor |
 | Debtor startup catch-up                 | On app startup, debtor recomputation runs once without waiting for 22:00                   |
@@ -464,6 +505,16 @@ To get **weekly earnings**, call `/api/earnings/daily` with any 7-day range.
 - `debtor.batch.run-on-startup` (default `true`) triggers a catch-up run at startup.
 - Scheduled runs only apply updates for students whose local time is `22:00` or later.
 - Startup catch-up ignores the 22:00 gate so statuses are corrected immediately after downtime.
+
+### Environment Variables
+
+Core variables used by Docker + Spring:
+- `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`
+- `SERVER_PORT`
+
+Optional operational overrides:
+- `DEBTOR_BATCH_CRON` (default `0 5 * * * *`)
+- `DEBTOR_BATCH_RUN_ON_STARTUP` (default `true`)
 
 ---
 

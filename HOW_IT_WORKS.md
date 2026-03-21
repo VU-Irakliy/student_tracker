@@ -33,6 +33,7 @@ track of:
 - Which classes have happened
 - Whether those classes have been paid for
 - How much money you've earned
+- How to move all your data to a fresh app instance (export/import)
 
 Think of it like a **digital notebook** — but one that understands the difference between
 "Ana paid for this class" and "Ivan's class came out of his prepaid package."
@@ -49,11 +50,22 @@ Each student has a profile with:
 - **Currency** — Euros, Dollars, or Rubles
 - **Timezone** — Spain or Russia (Moscow) — used for display purposes
 - **Class type** — Casual, EGE, OGE, IELTS, or TOFEL
+- **Start date** — classes cannot be created before this date
+- **Holiday mode** — temporary pause with a start date (and return date when the student comes back)
+- **Stopped attending** — keeps the student in the list but blocks new schedules/classes
 - **Notes** — anything you want to remember about them
 - **Debtor flag** — automatically turns on if a lesson has happened and is still unpaid
 
 You can update any of this at any time. Changing the pricing type (e.g. from per-class to
 package) only affects new payments going forward — old records stay as they were.
+
+If you mark a student as stopped attending, the app also hides/removes their upcoming sessions
+from the active workflow so no new future teaching records are created by accident.
+
+### Important rule for package students
+
+If a student pays by package, their profile should not keep `pricePerClass` or student-level
+`currency` values. Package payment details are stored on each package purchase record instead.
 
 The debtor flag is not edited manually. The system updates it in batch mode:
 - after 10:00 PM in each student's local timezone, and
@@ -110,6 +122,11 @@ a make-up lesson or a class moved from another day — you can add it as a **one
 One-off classes work exactly like regular ones but are flagged separately so you can tell
 them apart.
 
+Before creating/updating a class date, the app checks:
+- the date is not before the student's start date,
+- the student is not currently on holiday,
+- the student is not marked as stopped attending.
+
 ### Updating class details in one place
 
 You can update key class information in a single action: date, time, duration, note,
@@ -154,6 +171,12 @@ When the student pays, you record the package:
 - An optional description (e.g. "Spring bundle")
 
 The app tracks how many classes are **remaining** in the package.
+
+When recording a package purchase, these fields are required:
+- Total classes
+- Amount paid
+- Currency
+- Payment date
 
 ### Using a package
 
@@ -232,15 +255,17 @@ The app doesn't have a single "move" button. Instead, you do it in three steps:
 
 ### For per-class students
 
-**Step 1 — Cancel the original class, keeping the payment:**
-> Mark the old class as Cancelled, and choose "keep as paid" so the money stays on it.
+**Step 1 — Cancel the original class:**
+> Mark the old class as Cancelled (usually with release payment).
 
 **Step 2 — Add a new one-off class on the new date:**
 > Create a new class for the day the student is actually coming.
 
-**Step 3 — Move the payment from the old class to the new one:**
-> The app transfers the payment: the old class becomes Unpaid, and the new class
-> becomes Paid with the same amount.
+**Step 3 — Mark the new class as paid:**
+> If needed, enter the same amount manually so totals stay consistent.
+
+There is no single "transfer payment" button/endpoint.
+In practice, reassignment is done as: old class payment back to Unpaid, then new class to Paid.
 
 ---
 
@@ -263,9 +288,8 @@ This way the package count stays accurate throughout.
 
 ### Important note about moving payments
 
-You can only move a payment from a class that is currently marked as **Paid** (not Package,
-not Unpaid). If you accidentally released the payment before moving it, just mark the new
-class as paid directly.
+There is no direct payment-transfer action. To reassign payment, unpay/cancel payment on the
+old class and then mark the new class as paid.
 
 ---
 
@@ -368,8 +392,8 @@ show — but all the original values are still there.
 > returned automatically. For per-class students, the payment goes back to Unpaid.
 
 **"The student wants to move their Monday class to Wednesday."**
-> Cancel Monday (keep as paid), create a new class on Wednesday, then move the
-> payment from Monday to Wednesday. See section 8 for the full steps.
+> Cancel Monday, create a new class on Wednesday, then mark Wednesday as paid
+> (with the same amount if needed). See section 8 for the full steps.
 
 **"I marked a class as paid by mistake."**
 > Undo the payment — it goes back to Unpaid. If it was a package class, the slot is
@@ -402,4 +426,9 @@ show — but all the original values are still there.
 **"The price shown in other currencies looks wrong."**
 > The conversion rates update every hour. If the internet was down, the rates might be
 > slightly out of date — but they'll refresh automatically next time connectivity is restored.
+
+**"I installed a new app version and my new DB is empty. Can I transfer everything?"**
+> Yes. Export a snapshot from the old app (`GET /api/data/export`) and import it into the new
+> app (`POST /api/data/import` or `POST /api/data/import-file`). The import replaces current data
+> with the snapshot.
 

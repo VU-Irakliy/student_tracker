@@ -11,6 +11,7 @@ import com.studio.app.enums.Currency;
 import com.studio.app.enums.PricingType;
 import com.studio.app.enums.StudentClassType;
 import com.studio.app.enums.StudioTimezone;
+import com.studio.app.exception.BadRequestException;
 import com.studio.app.exception.ResourceNotFoundException;
 import com.studio.app.mapper.StudentMapper;
 import com.studio.app.repository.ClassSessionRepository;
@@ -142,7 +143,7 @@ class StudentServiceImplTest {
         }
 
         @Test
-        void shouldAllowNullPriceForPackageStudent() {
+        void shouldAllowPackageStudentWithoutPriceAndCurrency() {
             var request = CreateStudentRequest.builder()
                     .firstName("Pkg").lastName("Student")
                     .pricingType(PricingType.PACKAGE)
@@ -165,6 +166,70 @@ class StudentServiceImplTest {
             var result = studentService.createStudent(request);
 
             assertThat(result.getConvertedPrices()).isNull();
+        }
+
+        @Test
+        void shouldRejectHolidayModeWithoutHolidayFrom() {
+            var request = CreateStudentRequest.builder()
+                    .firstName("Ana")
+                    .lastName("Holiday")
+                    .pricingType(PricingType.PER_CLASS)
+                    .pricePerClass(new BigDecimal("30.00"))
+                    .currency(Currency.EUROS)
+                    .timezone(StudioTimezone.SPAIN)
+                    .holidayMode(true)
+                    .build();
+
+            assertThatThrownBy(() -> studentService.createStudent(request))
+                    .isInstanceOf(BadRequestException.class)
+                    .hasMessageContaining("holidayFrom");
+        }
+
+        @Test
+        void shouldRejectPerClassWithoutPrice() {
+            var request = CreateStudentRequest.builder()
+                    .firstName("Ana")
+                    .lastName("NoPrice")
+                    .pricingType(PricingType.PER_CLASS)
+                    .currency(Currency.EUROS)
+                    .timezone(StudioTimezone.SPAIN)
+                    .build();
+
+            assertThatThrownBy(() -> studentService.createStudent(request))
+                    .isInstanceOf(BadRequestException.class)
+                    .hasMessageContaining("pricePerClass");
+        }
+
+        @Test
+        void shouldRejectPriceWithoutCurrency() {
+            var request = CreateStudentRequest.builder()
+                    .firstName("Ana")
+                    .lastName("NoCurrency")
+                    .pricingType(PricingType.PER_CLASS)
+                    .pricePerClass(new BigDecimal("30.00"))
+                    .timezone(StudioTimezone.SPAIN)
+                    .build();
+
+            assertThatThrownBy(() -> studentService.createStudent(request))
+                    .isInstanceOf(BadRequestException.class)
+                    .hasMessageContaining("currency");
+        }
+
+        @Test
+        void shouldRejectHolidayToWithoutHolidayFrom() {
+            var request = CreateStudentRequest.builder()
+                    .firstName("Ana")
+                    .lastName("Holiday")
+                    .pricingType(PricingType.PER_CLASS)
+                    .pricePerClass(new BigDecimal("30.00"))
+                    .currency(Currency.EUROS)
+                    .timezone(StudioTimezone.SPAIN)
+                    .holidayTo(LocalDate.of(2026, 4, 1))
+                    .build();
+
+            assertThatThrownBy(() -> studentService.createStudent(request))
+                    .isInstanceOf(BadRequestException.class)
+                    .hasMessageContaining("holidayFrom");
         }
     }
 
@@ -280,6 +345,8 @@ class StudentServiceImplTest {
                     .pricingType(PricingType.PACKAGE).build());
 
             assertThat(activeStudent.getPricingType()).isEqualTo(PricingType.PACKAGE);
+            assertThat(activeStudent.getPricePerClass()).isNull();
+            assertThat(activeStudent.getCurrency()).isNull();
         }
 
         @Test
@@ -318,6 +385,154 @@ class StudentServiceImplTest {
                     .classType(StudentClassType.IELTS).build());
 
             assertThat(activeStudent.getClassType()).isEqualTo(StudentClassType.IELTS);
+        }
+
+        @Test
+        void shouldEnableHolidayModeAndCancelFutureSessions() {
+            var futureSession = ClassSession.builder()
+                    .id(12L).student(activeStudent)
+                    .classDate(LocalDate.of(2026, 3, 20))
+                    .startTime(LocalTime.of(10, 0))
+                    .durationMinutes(60)
+                    .build();
+
+            when(studentRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(activeStudent));
+            when(classSessionRepository.findByStudentIdAndDeletedFalseOrderByClassDateAscStartTimeAsc(1L))
+                    .thenReturn(List.of(futureSession));
+            when(studentRepository.save(any())).thenReturn(activeStudent);
+            when(studentMapper.toResponse(activeStudent)).thenReturn(StudentResponse.builder().build());
+
+            studentService.updateStudent(1L, UpdateStudentRequest.builder()
+                    .holidayMode(true)
+                    .holidayFrom(LocalDate.of(2026, 3, 15))
+                    .build());
+
+            assertThat(activeStudent.isHolidayMode()).isTrue();
+            assertThat(futureSession.getStatus().name()).isEqualTo("CANCELLED");
+        }
+
+        @Test
+        void shouldUpdateStoppedAttendingFlag() {
+            var pastSession = ClassSession.builder()
+                    .id(20L).student(activeStudent)
+                    .classDate(LocalDate.now().minusDays(1))
+                    .startTime(LocalTime.of(10, 0))
+                    .durationMinutes(60)
+                    .build();
+            var todaySession = ClassSession.builder()
+                    .id(21L).student(activeStudent)
+                    .classDate(LocalDate.now())
+                    .startTime(LocalTime.of(11, 0))
+                    .durationMinutes(60)
+                    .build();
+            var futureSession = ClassSession.builder()
+                    .id(22L).student(activeStudent)
+                    .classDate(LocalDate.now().plusDays(5))
+                    .startTime(LocalTime.of(12, 0))
+                    .durationMinutes(60)
+                    .build();
+
+            when(studentRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(activeStudent));
+            when(classSessionRepository.findByStudentIdAndDeletedFalseOrderByClassDateAscStartTimeAsc(1L))
+                    .thenReturn(List.of(pastSession, todaySession, futureSession));
+            when(studentRepository.save(any())).thenReturn(activeStudent);
+            when(studentMapper.toResponse(activeStudent)).thenReturn(StudentResponse.builder().build());
+
+            studentService.updateStudent(1L, UpdateStudentRequest.builder()
+                    .stoppedAttending(true)
+                    .build());
+
+            assertThat(activeStudent.isStoppedAttending()).isTrue();
+            assertThat(pastSession.isDeleted()).isFalse();
+            assertThat(todaySession.isDeleted()).isFalse();
+            assertThat(futureSession.isDeleted()).isTrue();
+        }
+
+        @Test
+        void shouldRejectBlankFirstNameOnUpdate() {
+            when(studentRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(activeStudent));
+
+            assertThatThrownBy(() -> studentService.updateStudent(1L, UpdateStudentRequest.builder()
+                    .firstName("   ")
+                    .build()))
+                    .isInstanceOf(BadRequestException.class)
+                    .hasMessageContaining("firstName and lastName are required");
+        }
+
+        @Test
+        void shouldRejectPerClassUpdateWithoutPrice() {
+            var packageStudent = Student.builder()
+                    .id(10L)
+                    .firstName("Pkg")
+                    .lastName("Student")
+                    .pricingType(PricingType.PACKAGE)
+                    .pricePerClass(null)
+                    .timezone(StudioTimezone.SPAIN)
+                    .classType(StudentClassType.CASUAL)
+                    .build();
+
+            when(studentRepository.findByIdAndDeletedFalse(10L)).thenReturn(Optional.of(packageStudent));
+
+            assertThatThrownBy(() -> studentService.updateStudent(10L, UpdateStudentRequest.builder()
+                    .pricingType(PricingType.PER_CLASS)
+                    .build()))
+                    .isInstanceOf(BadRequestException.class)
+                    .hasMessageContaining("pricePerClass");
+        }
+
+        @Test
+        void shouldRejectPriceUpdateWithoutCurrency() {
+            var studentWithoutCurrency = Student.builder()
+                    .id(11L)
+                    .firstName("Ana")
+                    .lastName("NoCurrency")
+                    .pricingType(PricingType.PER_CLASS)
+                    .pricePerClass(new BigDecimal("30.00"))
+                    .currency(null)
+                    .timezone(StudioTimezone.SPAIN)
+                    .classType(StudentClassType.CASUAL)
+                    .build();
+
+            when(studentRepository.findByIdAndDeletedFalse(11L)).thenReturn(Optional.of(studentWithoutCurrency));
+
+            assertThatThrownBy(() -> studentService.updateStudent(11L, UpdateStudentRequest.builder()
+                    .notes("touch")
+                    .build()))
+                    .isInstanceOf(BadRequestException.class)
+                    .hasMessageContaining("currency");
+        }
+
+        @Test
+        void shouldRejectPackageUpdateWithPriceOrCurrency() {
+            var packageStudent = Student.builder()
+                    .id(10L)
+                    .firstName("Pkg")
+                    .lastName("Student")
+                    .pricingType(PricingType.PACKAGE)
+                    .pricePerClass(null)
+                    .currency(null)
+                    .timezone(StudioTimezone.SPAIN)
+                    .classType(StudentClassType.CASUAL)
+                    .build();
+
+            when(studentRepository.findByIdAndDeletedFalse(10L)).thenReturn(Optional.of(packageStudent));
+
+            assertThatThrownBy(() -> studentService.updateStudent(10L, UpdateStudentRequest.builder()
+                    .pricePerClass(new BigDecimal("40.00"))
+                    .build()))
+                    .isInstanceOf(BadRequestException.class)
+                    .hasMessageContaining("must be null");
+        }
+
+        @Test
+        void shouldRejectHolidayToWithoutHolidayFromOnUpdate() {
+            when(studentRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(activeStudent));
+
+            assertThatThrownBy(() -> studentService.updateStudent(1L, UpdateStudentRequest.builder()
+                    .holidayTo(LocalDate.of(2026, 4, 1))
+                    .build()))
+                    .isInstanceOf(BadRequestException.class)
+                    .hasMessageContaining("holidayFrom");
         }
 
         @Test

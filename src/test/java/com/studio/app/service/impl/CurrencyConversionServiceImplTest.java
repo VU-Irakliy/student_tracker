@@ -232,7 +232,7 @@ class CurrencyConversionServiceImplTest {
             shortTtlService.convertToAll(new BigDecimal("1000.00"), Currency.RUBLES);
 
             // Now make API fail
-            when(responseSpec.body(eq(Map.class)))
+            lenient().when(responseSpec.body(eq(Map.class)))
                     .thenThrow(new RuntimeException("API down"));
 
             // Should still get results from stale cache

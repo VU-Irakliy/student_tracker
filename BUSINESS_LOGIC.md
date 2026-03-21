@@ -19,7 +19,8 @@ situation.
 9. [Student Deletion](#9-student-deletion)
 10. [Debtor Status Batch](#10-debtor-status-batch)
 11. [Currency Conversion](#11-currency-conversion)
-12. [Error Reference](#12-error-reference)
+12. [Data Export/Import](#12-data-exportimport)
+13. [Error Reference](#13-error-reference)
 
 ---
 
@@ -32,6 +33,11 @@ situation.
 | `ClassSession`    | A concrete class instance on a specific date. Either generated from a schedule or a one-off. |
 | `PackagePurchase` | A prepaid block of N classes. Tracks `classesRemaining` as sessions are consumed.      |
 | `Payer`           | A third-party contact (e.g. parent) who pays on behalf of the student.                 |
+
+Student availability fields:
+- `startDate` — earliest date when sessions can be created for the student.
+- `holidayMode`, `holidayFrom`, `holidayTo` — controls temporary pause in attendance.
+- `stoppedAttending` — blocks new sessions/schedule edits while keeping student visible in API lists.
 
 ### Status Enums
 
@@ -68,6 +74,13 @@ A student is assigned one of two pricing types at creation time (changeable via 
 - When `/pay` is called, the system automatically deducts one class from the oldest active package (**FIFO**).
 - `paymentStatus` becomes `PACKAGE` and the session is linked to the specific package via `packagePurchaseId`.
 
+### Pricing Invariants (Validation Rules)
+
+- `PER_CLASS`: `pricePerClass` is required.
+- If `pricePerClass` is provided, `currency` is required.
+- `PACKAGE`: student-level `pricePerClass` and `currency` must be `null`.
+- When switching a student to `PACKAGE`, backend update logic clears stored `pricePerClass` and `currency` on the student profile.
+
 > ⚠️ A student's pricing type can be changed at any time. Existing session records are not retroactively affected — only new payments use the new model.
 
 ---
@@ -95,10 +108,24 @@ A student is assigned one of two pricing types at creation time (changeable via 
 Sessions are created with `status=SCHEDULED` and `paymentStatus=UNPAID`.  
 There is no automatic status transition — status/payment changes are manual.
 
+Supported paid-on-cancelled combinations:
+- `status=CANCELLED` + `paymentStatus=PAID` is valid for **PER_CLASS** students.
+- `status=CANCELLED` + `paymentStatus=PACKAGE` is valid for **PACKAGE** students.
+- These combinations are intentional (for example, late cancellation that is still charged).
+
 Supported manual actions:
 - `PUT /api/sessions/{id}` — unified partial update (date/time/duration/status/payment toggle/note)
 - `POST /api/sessions/{id}/completion?completed=true|false` — sets `status` to `COMPLETED` or `SCHEDULED`
-- `POST /api/sessions/{id}/pay`, `/cancel`, `/cancel-payment`, `/move-payment` remain available
+- `POST /api/sessions/{id}/pay`, `/cancel`, and `/cancel-payment` remain available
+
+Availability checks before creating/updating class dates:
+- reject if `classDate < student.startDate`
+- reject if `student.holidayMode = true` and `classDate >= holidayFrom`
+- reject if `student.stoppedAttending = true`
+
+Holiday update behavior (`PUT /api/students/{id}`):
+- `holidayMode=true` requires `holidayFrom`; existing sessions from that date are auto-cancelled.
+- `holidayMode=false` requires `holidayTo`; auto-cancelled sessions on/after return date are restored to `SCHEDULED`.
 
 ---
 
@@ -135,7 +162,7 @@ POST /api/sessions/{id}/cancel
 **Result (PER_CLASS student):**
 - `status` → `CANCELLED`
 - `paymentStatus` → `UNPAID`
-- The money is not automatically transferred — use `/move-payment` to apply it elsewhere
+- The payment is not transferred automatically — if needed, mark another session as paid manually
 
 **Result (PACKAGE student):**
 - `status` → `CANCELLED`
@@ -160,6 +187,9 @@ POST /api/sessions/{id}/cancel
 - `paymentStatus` stays `UNPAID` (no change — nothing to release)
 - No package is affected
 
+> Note: `CANCELLED` sessions are still allowed to remain paid when cancellation is done with
+> `keepAsPaid: true` (both `PAID` and `PACKAGE` are supported).
+
 ---
 
 ### 4.4 Attempt to cancel an already-cancelled session
@@ -173,14 +203,13 @@ POST /api/sessions/{id}/cancel
 "Moving a lesson" means rescheduling a class to a different date/time. The system handles
 this through a combination of **cancellation** and **one-off session creation**.
 
-### Scenario: Student wants to move Monday's class to Wednesday
+### Scenario: Student wants to move Monday's class to Wednesday (PER_CLASS)
 
-**Step 1 — Cancel the original session (optionally keeping payment):**
+**Step 1 — Cancel the original session:**
 ```json
 POST /api/sessions/{mondaySessionId}/cancel
-{ "keepAsPaid": true }
+{ "keepAsPaid": false }
 ```
-> If `keepAsPaid: true`, the payment stays on the cancelled session and must be manually moved.
 
 **Step 2 — Create a one-off session for the new date:**
 ```json
@@ -194,23 +223,23 @@ POST /api/students/{studentId}/sessions
 ```
 > One-off sessions are created as `UNPAID`. The new session gets its `priceCharged` from the student's current price.
 
-**Step 3 — Move the payment from the cancelled session to the new one:**
+**Step 3 — Mark the new session as paid:**
 ```json
-POST /api/sessions/{mondaySessionId}/move-payment
-{ "targetSessionId": {wednesdaySessionId} }
+POST /api/sessions/{wednesdaySessionId}/pay
+{ "amountOverride": 30.00 }
 ```
+> `amountOverride` is optional. Use it when you need to preserve/override the charge amount explicitly.
 
 **Result:**
 - Monday session: `paymentStatus` → `UNPAID`
-- Wednesday session: `paymentStatus` → `PAID`, `priceCharged` copied from source
+- Wednesday session: `paymentStatus` → `PAID`
 
-> ⚠️ Move-payment only works when the **source** session has `paymentStatus=PAID`.
-> If the original session was cancelled with `keepAsPaid: false` first, it becomes `UNPAID`
-> and the move cannot happen — mark the new session as paid directly instead.
+> ⚠️ There is no direct "transfer payment" endpoint. Reassigning payment is a two-step operation:
+> cancel/unpay old session + pay the new one.
 
 ### Scenario: Move a PACKAGE session
 
-PACKAGE sessions **cannot** use `/move-payment` directly (move-payment only handles `PAID` status).
+PACKAGE sessions use slot reallocation (not money transfer):
 
 **Recommended flow:**
 
@@ -239,7 +268,9 @@ POST /api/students/{id}/packages
 
 - `classesRemaining` is initialised to `totalClasses`
 - The package is immediately **active** (available for session deduction)
-- `currency` defaults to the student's own currency if omitted
+- Required fields: `totalClasses`, `amountPaid`, `currency`, `paymentDate`
+
+Validation failures return `400 Bad Request` (for example: missing `currency` or `paymentDate`).
 
 ---
 
@@ -363,23 +394,17 @@ Session `status` is **not** affected.
 
 ---
 
-### 7.3 Move a payment between sessions
+### 7.3 Reassigning payment between sessions (manual flow)
 
-```json
-POST /api/sessions/{sourceId}/move-payment
-{ "targetSessionId": 99 }
-```
+There is no dedicated `/move-payment` endpoint.
 
-**Guards:**
-- Source must be `paymentStatus=PAID` → otherwise `400 Bad Request`
-- Target must not be already `PAID` → otherwise `400 Bad Request`
+**Per-class flow:**
+1. `POST /api/sessions/{sourceId}/cancel-payment` (source becomes `UNPAID`)
+2. `POST /api/sessions/{targetId}/pay` (optionally with `amountOverride`)
 
-**Result:**
-- Source → `paymentStatus=UNPAID`
-- Target → `paymentStatus=PAID`, `priceCharged` copied from source
-
-> Move-payment only handles per-class (`PAID`) sessions. For package sessions, use
-> cancel-payment + pay on the target.
+**Package flow:**
+1. `POST /api/sessions/{sourceId}/cancel-payment` (slot returned)
+2. `POST /api/sessions/{targetId}/pay` (slot deducted again by FIFO)
 
 ---
 
@@ -498,7 +523,34 @@ is always present.
 
 ---
 
-## 12. Error Reference
+## 12. Data Export/Import
+
+### Export (`GET /api/data/export`)
+
+- Returns one compressed `.json.gz` snapshot containing all core tables:
+  - students
+  - weekly schedules
+  - package purchases
+  - class sessions
+  - payers
+- Includes active and soft-deleted rows.
+- Uses deterministic ordering by ID for stable snapshots.
+
+### Import (`POST /api/data/import`)
+
+- Replaces current data with the supplied snapshot.
+- Executes in one transaction (all-or-nothing).
+- Validates references while importing (e.g., session -> student/package/schedule links).
+- Intended for migration to a fresh deployment/database.
+
+### Import file (`POST /api/data/import-file`)
+
+- Accepts uploaded `.json.gz` (or plain `.json`) snapshot as multipart form-data.
+- Applies the same validation and all-or-nothing transaction semantics as `/import`.
+
+---
+
+## 13. Error Reference
 
 | HTTP Status | When it occurs                                                              |
 |-------------|-----------------------------------------------------------------------------|
@@ -507,13 +559,27 @@ is always present.
 | `409`       | Conflict — e.g. adding a weekly schedule on a day the student already has   |
 | `500`       | Unexpected server error (logged with full stack trace to error log file)    |
 
-All error responses follow a consistent JSON shape:
+Business/technical errors (`400`, `404`, `409`, `500`) follow this JSON shape:
 ```json
 {
   "status": 400,
   "error": "Bad Request",
   "message": "Session is already paid",
   "path": "/api/sessions/5/pay",
+  "timestamp": "2026-04-12T10:30:00"
+}
+```
+
+Bean-validation errors (`MethodArgumentNotValidException`) include a field map:
+```json
+{
+  "status": 400,
+  "error": "Bad Request",
+  "message": "Validation failed",
+  "errors": {
+    "fieldName": "validation message"
+  },
+  "path": "/api/students",
   "timestamp": "2026-04-12T10:30:00"
 }
 ```

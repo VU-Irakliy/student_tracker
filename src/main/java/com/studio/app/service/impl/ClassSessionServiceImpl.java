@@ -1,16 +1,17 @@
 package com.studio.app.service.impl;
 
 import com.studio.app.dto.request.CancelSessionRequest;
-import com.studio.app.dto.request.MovePaymentRequest;
 import com.studio.app.dto.request.OneOffSessionRequest;
 import com.studio.app.dto.request.PaySessionRequest;
 import com.studio.app.dto.request.UpdateSessionRequest;
 import com.studio.app.dto.response.CalendarDayResponse;
 import com.studio.app.dto.response.ClassSessionResponse;
 import com.studio.app.entity.ClassSession;
+import com.studio.app.entity.Student;
 import com.studio.app.enums.ClassStatus;
 import com.studio.app.enums.PaymentStatus;
 import com.studio.app.enums.PricingType;
+import com.studio.app.enums.StudioTimezone;
 import com.studio.app.exception.BadRequestException;
 import com.studio.app.exception.ResourceNotFoundException;
 import com.studio.app.mapper.ClassSessionMapper;
@@ -26,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -46,14 +48,18 @@ public class ClassSessionServiceImpl implements ClassSessionService {
 
     /** {@inheritDoc} */
     @Override
-    public ClassSessionResponse createOneOffSession(Long studentId, OneOffSessionRequest request) {
+    public ClassSessionResponse createOneOffSession(Long studentId, OneOffSessionRequest request,
+                                                    StudioTimezone viewerTimezone) {
         var student = studentRepository.findByIdAndDeletedFalse(studentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Student", studentId));
+
+        ensureStudentCanHaveSessionOnDate(student, request.getClassDate());
 
         var session = ClassSession.builder()
                 .student(student)
                 .classDate(request.getClassDate())
                 .startTime(request.getStartTime())
+                .timezone(student.getTimezone())
                 .durationMinutes(request.getDurationMinutes())
                 .priceCharged(student.getPricePerClass())
                 .currency(student.getCurrency())
@@ -61,33 +67,44 @@ public class ClassSessionServiceImpl implements ClassSessionService {
                 .note(request.getNote())
                 .build();
 
-        return enrichWithConvertedPrices(sessionMapper.toResponse(sessionRepository.save(session)));
+        return toResponse(sessionRepository.save(session), viewerTimezone);
     }
 
     /** {@inheritDoc} */
     @Override
     @Transactional(readOnly = true)
-    public List<ClassSessionResponse> getSessionsForStudent(Long studentId, LocalDate from, LocalDate to) {
+    public List<ClassSessionResponse> getSessionsForStudent(Long studentId, LocalDate from, LocalDate to,
+                                                            StudioTimezone viewerTimezone) {
+        ensureActiveStudentExists(studentId);
+
         var sessions = (from != null && to != null)
                 ? sessionRepository.findByStudentIdAndDateRange(studentId, from, to)
-                : sessionRepository.findByStudentIdAndDeletedFalseOrderByClassDateAscStartTimeAsc(studentId);
-        return sessionMapper.toResponseList(sessions).stream()
-                .map(this::enrichWithConvertedPrices).toList();
+                : (from != null)
+                    ? sessionRepository.findByStudentIdAndClassDateGreaterThanEqualAndDeletedFalseOrderByClassDateAscStartTimeAsc(studentId, from)
+                    : (to != null)
+                        ? sessionRepository.findByStudentIdAndClassDateLessThanEqualAndDeletedFalseOrderByClassDateAscStartTimeAsc(studentId, to)
+                        : sessionRepository.findByStudentIdAndDeletedFalseOrderByClassDateAscStartTimeAsc(studentId);
+        return sessions.stream().map(session -> toResponse(session, viewerTimezone)).toList();
     }
 
     /** {@inheritDoc} */
     @Override
     @Transactional(readOnly = true)
-    public ClassSessionResponse getSessionById(Long sessionId) {
-        return enrichWithConvertedPrices(sessionMapper.toResponse(findActiveSession(sessionId)));
+    public ClassSessionResponse getSessionById(Long sessionId, StudioTimezone viewerTimezone) {
+        return toResponse(findActiveSession(sessionId), viewerTimezone);
     }
 
     /** {@inheritDoc} */
     @Override
-    public ClassSessionResponse updateSession(Long sessionId, UpdateSessionRequest request) {
+    public ClassSessionResponse updateSession(Long sessionId, UpdateSessionRequest request,
+                                              StudioTimezone viewerTimezone) {
         var session = findActiveSession(sessionId);
+        session.setTimezone(session.getStudent().getTimezone());
 
-        Optional.ofNullable(request.getClassDate()).ifPresent(session::setClassDate);
+        Optional.ofNullable(request.getClassDate()).ifPresent(classDate -> {
+            ensureStudentCanHaveSessionOnDate(session.getStudent(), classDate);
+            session.setClassDate(classDate);
+        });
         Optional.ofNullable(request.getStartTime()).ifPresent(session::setStartTime);
         Optional.ofNullable(request.getDurationMinutes()).ifPresent(session::setDurationMinutes);
         Optional.ofNullable(request.getStatus()).ifPresent(session::setStatus);
@@ -101,12 +118,13 @@ public class ClassSessionServiceImpl implements ClassSessionService {
             }
         }
 
-        return enrichWithConvertedPrices(sessionMapper.toResponse(sessionRepository.save(session)));
+        return toResponse(sessionRepository.save(session), viewerTimezone);
     }
 
     /** {@inheritDoc} */
     @Override
-    public ClassSessionResponse cancelSession(Long sessionId, CancelSessionRequest request) {
+    public ClassSessionResponse cancelSession(Long sessionId, CancelSessionRequest request,
+                                              StudioTimezone viewerTimezone) {
         var session = findActiveSession(sessionId);
 
         if (session.getStatus() == ClassStatus.CANCELLED) {
@@ -120,8 +138,8 @@ public class ClassSessionServiceImpl implements ClassSessionService {
 
         if (!keepPaid) {
             // For package sessions: return class slot to the package
-            if (session.getPaymentStatus() == PaymentStatus.PACKAGE && session.getPackagePurchase() != null) {
-                var pkg = session.getPackagePurchase();
+            if (session.getPaymentStatus() == PaymentStatus.PACKAGE) {
+                var pkg = requireLinkedPackageForPackagePaidSession(session);
                 pkg.setClassesRemaining(pkg.getClassesRemaining() + 1);
                 packageRepository.save(pkg);
                 session.setPackagePurchase(null);
@@ -130,21 +148,23 @@ public class ClassSessionServiceImpl implements ClassSessionService {
             session.setPaymentStatus(PaymentStatus.UNPAID);
         }
 
-        return enrichWithConvertedPrices(sessionMapper.toResponse(sessionRepository.save(session)));
+        return toResponse(sessionRepository.save(session), viewerTimezone);
     }
 
     /** {@inheritDoc} */
     @Override
-    public ClassSessionResponse markSessionPaid(Long sessionId, PaySessionRequest request) {
+    public ClassSessionResponse markSessionPaid(Long sessionId, PaySessionRequest request,
+                                                StudioTimezone viewerTimezone) {
         var session = findActiveSession(sessionId);
         markPaidInternal(session, request.getAmountOverride());
 
-        return enrichWithConvertedPrices(sessionMapper.toResponse(sessionRepository.save(session)));
+        return toResponse(sessionRepository.save(session), viewerTimezone);
     }
 
     /** {@inheritDoc} */
     @Override
-    public ClassSessionResponse setSessionCompletion(Long sessionId, boolean completed) {
+    public ClassSessionResponse setSessionCompletion(Long sessionId, boolean completed,
+                                                     StudioTimezone viewerTimezone) {
         var session = findActiveSession(sessionId);
 
         if (session.getStatus() == ClassStatus.CANCELLED) {
@@ -153,74 +173,55 @@ public class ClassSessionServiceImpl implements ClassSessionService {
 
         session.setStatus(completed ? ClassStatus.COMPLETED : ClassStatus.SCHEDULED);
 
-        return enrichWithConvertedPrices(sessionMapper.toResponse(sessionRepository.save(session)));
+        return toResponse(sessionRepository.save(session), viewerTimezone);
     }
 
     /** {@inheritDoc} */
     @Override
-    public ClassSessionResponse cancelSessionPayment(Long sessionId) {
+    public ClassSessionResponse cancelSessionPayment(Long sessionId, StudioTimezone viewerTimezone) {
         var session = findActiveSession(sessionId);
         markUnpaidInternal(session);
-        return enrichWithConvertedPrices(sessionMapper.toResponse(sessionRepository.save(session)));
+        return toResponse(sessionRepository.save(session), viewerTimezone);
     }
 
-    /** {@inheritDoc} */
-    @Override
-    public ClassSessionResponse movePayment(Long sessionId, MovePaymentRequest request) {
-        var source = findActiveSession(sessionId);
 
-        if (source.getPaymentStatus() != PaymentStatus.PAID) {
-            throw new BadRequestException("Source session must be in PAID status to move its payment");
-        }
-
-        var target = findActiveSession(request.getTargetSessionId());
-
-        if (target.getPaymentStatus() == PaymentStatus.PAID) {
-            throw new BadRequestException("Target session is already paid");
-        }
-
-        // Transfer payment
-        target.setPriceCharged(source.getPriceCharged());
-        target.setPaymentStatus(PaymentStatus.PAID);
-
-        source.setPaymentStatus(PaymentStatus.UNPAID);
-
-        sessionRepository.save(source);
-        return enrichWithConvertedPrices(sessionMapper.toResponse(sessionRepository.save(target)));
-    }
 
     /** {@inheritDoc} */
     @Override
     @Transactional(readOnly = true)
-    public List<ClassSessionResponse> getSessionsByPaymentStatus(Long studentId, PaymentStatus paymentStatus) {
-        return sessionMapper.toResponseList(
-                sessionRepository.findByStudentIdAndPaymentStatusAndDeletedFalse(studentId, paymentStatus))
-                .stream().map(this::enrichWithConvertedPrices).toList();
+    public List<ClassSessionResponse> getSessionsByPaymentStatus(Long studentId, PaymentStatus paymentStatus,
+                                                                 StudioTimezone viewerTimezone) {
+        ensureActiveStudentExists(studentId);
+        return sessionRepository.findByStudentIdAndPaymentStatusAndDeletedFalse(studentId, paymentStatus)
+                .stream().map(session -> toResponse(session, viewerTimezone)).toList();
     }
 
 
     /** {@inheritDoc} */
     @Override
     @Transactional(readOnly = true)
-    public List<CalendarDayResponse> getCalendar(LocalDate from, LocalDate to) {
+    public List<CalendarDayResponse> getCalendar(LocalDate from, LocalDate to, StudioTimezone viewerTimezone) {
         var sessions = sessionRepository.findCalendarSessions(from, to);
 
-        return sessions.stream()
-                .collect(Collectors.groupingBy(ClassSession::getClassDate))
+        var converted = sessions.stream()
+                .map(session -> toResponse(session, viewerTimezone))
+                .toList();
+
+        return converted.stream()
+                .collect(Collectors.groupingBy(ClassSessionResponse::getClassDate))
                 .entrySet()
                 .stream()
                 .sorted(java.util.Map.Entry.comparingByKey())
                 .map(entry -> CalendarDayResponse.builder()
                         .date(entry.getKey())
                         .totalHours(toHours(entry.getValue().stream()
-                                .mapToInt(ClassSession::getDurationMinutes)
+                                .mapToInt(ClassSessionResponse::getDurationMinutes)
                                 .sum()))
                         .completedHours(toHours(entry.getValue().stream()
                                 .filter(session -> session.getStatus() == ClassStatus.COMPLETED)
-                                .mapToInt(ClassSession::getDurationMinutes)
+                                .mapToInt(ClassSessionResponse::getDurationMinutes)
                                 .sum()))
-                        .sessions(sessionMapper.toResponseList(entry.getValue()).stream()
-                                .map(this::enrichWithConvertedPrices).toList())
+                        .sessions(entry.getValue())
                         .build())
                 .toList();
     }
@@ -231,6 +232,31 @@ public class ClassSessionServiceImpl implements ClassSessionService {
      * Populates the {@code convertedPrices} field on a response by delegating
      * to the {@link CurrencyConversionService}.
      */
+    private ClassSessionResponse toResponse(ClassSession session, StudioTimezone viewerTimezone) {
+        var response = sessionMapper.toResponse(session);
+        // Keep timezone explicit in case generated mapper code is stale in local IDE caches.
+        response.setTimezone(session.getTimezone());
+
+        StudioTimezone sourceTimezone = Optional.ofNullable(session.getTimezone()).orElse(StudioTimezone.SPAIN);
+        StudioTimezone effectiveViewerTimezone = Optional.ofNullable(viewerTimezone).orElse(StudioTimezone.SPAIN);
+
+        response.setOriginalClassDate(session.getClassDate());
+        response.setOriginalStartTime(session.getStartTime());
+        response.setOriginalTimezone(sourceTimezone);
+        response.setViewerTimezone(effectiveViewerTimezone);
+
+        if (session.getClassDate() != null && session.getStartTime() != null) {
+            var sourceDateTime = LocalDateTime.of(session.getClassDate(), session.getStartTime())
+                    .atZone(sourceTimezone.toZoneId());
+            var viewerDateTime = sourceDateTime.withZoneSameInstant(effectiveViewerTimezone.toZoneId());
+            response.setClassDate(viewerDateTime.toLocalDate());
+            response.setStartTime(viewerDateTime.toLocalTime());
+            response.setTimezone(effectiveViewerTimezone);
+        }
+
+        return enrichWithConvertedPrices(response);
+    }
+
     private ClassSessionResponse enrichWithConvertedPrices(ClassSessionResponse response) {
         if (response.getPriceCharged() != null && response.getCurrency() != null) {
             response.setConvertedPrices(
@@ -250,6 +276,11 @@ public class ClassSessionServiceImpl implements ClassSessionService {
                 .orElseThrow(() -> new ResourceNotFoundException("ClassSession", id));
     }
 
+    private void ensureActiveStudentExists(Long studentId) {
+        studentRepository.findByIdAndDeletedFalse(studentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Student", studentId));
+    }
+
     private void markPaidInternal(ClassSession session, java.math.BigDecimal amountOverride) {
         var student = session.getStudent();
 
@@ -264,7 +295,11 @@ public class ClassSessionServiceImpl implements ClassSessionService {
                     .stream()
                     .findFirst()
                     .orElseThrow(() -> new BadRequestException(
-                            "No active package with remaining classes found"));
+                            "Cannot mark session as paid: no active package assigned to student"));
+
+            if (pkg.getClassesRemaining() <= 0) {
+                throw new BadRequestException("Cannot mark session as paid: selected package has no remaining classes");
+            }
 
             pkg.setClassesRemaining(pkg.getClassesRemaining() - 1);
             packageRepository.save(pkg);
@@ -285,13 +320,35 @@ public class ClassSessionServiceImpl implements ClassSessionService {
         }
 
         // Return class to package if applicable
-        if (session.getPaymentStatus() == PaymentStatus.PACKAGE && session.getPackagePurchase() != null) {
-            var pkg = session.getPackagePurchase();
+        if (session.getPaymentStatus() == PaymentStatus.PACKAGE) {
+            var pkg = requireLinkedPackageForPackagePaidSession(session);
             pkg.setClassesRemaining(pkg.getClassesRemaining() + 1);
             packageRepository.save(pkg);
             session.setPackagePurchase(null);
         }
 
         session.setPaymentStatus(PaymentStatus.UNPAID);
+    }
+
+    private com.studio.app.entity.PackagePurchase requireLinkedPackageForPackagePaidSession(ClassSession session) {
+        var pkg = session.getPackagePurchase();
+        if (pkg == null) {
+            throw new BadRequestException("Session is marked as package-paid but has no linked package");
+        }
+        return pkg;
+    }
+
+    private void ensureStudentCanHaveSessionOnDate(Student student, LocalDate classDate) {
+        if (student.isStoppedAttending()) {
+            throw new BadRequestException("Student is marked as stopped attending");
+        }
+
+        if (student.getStartDate() != null && classDate.isBefore(student.getStartDate())) {
+            throw new BadRequestException("Class date cannot be before student's startDate");
+        }
+
+        if (student.isHolidayMode() && student.getHolidayFrom() != null && !classDate.isBefore(student.getHolidayFrom())) {
+            throw new BadRequestException("Student is currently on holiday from " + student.getHolidayFrom());
+        }
     }
 }

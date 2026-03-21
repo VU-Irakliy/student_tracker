@@ -3,6 +3,7 @@ package com.studio.app.dto.response;
 import com.studio.app.enums.ClassStatus;
 import com.studio.app.enums.Currency;
 import com.studio.app.enums.PaymentStatus;
+import com.studio.app.enums.StudioTimezone;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -34,6 +35,21 @@ public class ClassSessionResponse {
 
     /** Session start time in the student's timezone. */
     private LocalTime startTime;
+
+    /** Original stored session date before viewer-timezone conversion. */
+    private LocalDate originalClassDate;
+
+    /** Original stored session start time before viewer-timezone conversion. */
+    private LocalTime originalStartTime;
+
+    /** Timezone used for this session timing. */
+    private StudioTimezone timezone;
+
+    /** Original timezone captured on the session record. */
+    private StudioTimezone originalTimezone;
+
+    /** Timezone requested by the viewer (applied to classDate/startTime). */
+    private StudioTimezone viewerTimezone;
 
     /** Session duration in minutes. */
     private Integer durationMinutes;
