@@ -74,6 +74,13 @@ A student is assigned one of two pricing types at creation time (changeable via 
 - When `/pay` is called, the system automatically deducts one class from the oldest active package (**FIFO**).
 - `paymentStatus` becomes `PACKAGE` and the session is linked to the specific package via `packagePurchaseId`.
 
+### Pricing Invariants (Validation Rules)
+
+- `PER_CLASS`: `pricePerClass` is required.
+- If `pricePerClass` is provided, `currency` is required.
+- `PACKAGE`: student-level `pricePerClass` and `currency` must be `null`.
+- When switching a student to `PACKAGE`, backend update logic clears stored `pricePerClass` and `currency` on the student profile.
+
 > ⚠️ A student's pricing type can be changed at any time. Existing session records are not retroactively affected — only new payments use the new model.
 
 ---
@@ -261,7 +268,9 @@ POST /api/students/{id}/packages
 
 - `classesRemaining` is initialised to `totalClasses`
 - The package is immediately **active** (available for session deduction)
-- `currency` defaults to the student's own currency if omitted
+- Required fields: `totalClasses`, `amountPaid`, `currency`, `paymentDate`
+
+Validation failures return `400 Bad Request` (for example: missing `currency` or `paymentDate`).
 
 ---
 

@@ -246,7 +246,7 @@ cached value is used as a fallback.
 | POST   | `/api/students`             | Create a student                   |
 | GET    | `/api/students`             | List all; `?search=name` to filter |
 | GET    | `/api/students/{id}`        | Get one student                    |
-| PUT    | `/api/students/{id}`        | Update student (partial)           |
+| PATCH  | `/api/students/{id}`        | Update student (partial)           |
 | DELETE | `/api/students/{id}`        | Soft-delete student + related data |
 
 **Create / update body (all fields optional on update):**
@@ -275,6 +275,11 @@ cached value is used as a fallback.
 
 Partial update semantics:
 - sending `null` for `pricePerClass` and/or `currency` keeps existing stored values unchanged.
+- exception: when `pricingType` is set to `PACKAGE`, the backend always clears student `pricePerClass` and `currency`.
+
+Pricing invariants:
+- `PER_CLASS`: `pricePerClass` is required; `currency` is required when `pricePerClass` is provided.
+- `PACKAGE`: student-level `pricePerClass` and `currency` must be `null`; package purchase stores payment amount/currency.
 
 Student responses also include `debtor` (boolean), maintained by the debtor batch process.
 
@@ -403,7 +408,7 @@ POST /api/sessions/{id}/completion?completed=false
 ```
 
 > `amountPaid` is what the student actually paid — it can be any negotiated amount.  
-> `currency` defaults to the student's own currency if omitted.
+> Required fields: `totalClasses`, `amountPaid`, `currency`, `paymentDate`.
 
 ---
 
@@ -500,6 +505,16 @@ Exported file name format:
 - `debtor.batch.run-on-startup` (default `true`) triggers a catch-up run at startup.
 - Scheduled runs only apply updates for students whose local time is `22:00` or later.
 - Startup catch-up ignores the 22:00 gate so statuses are corrected immediately after downtime.
+
+### Environment Variables
+
+Core variables used by Docker + Spring:
+- `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`
+- `SERVER_PORT`
+
+Optional operational overrides:
+- `DEBTOR_BATCH_CRON` (default `0 5 * * * *`)
+- `DEBTOR_BATCH_RUN_ON_STARTUP` (default `true`)
 
 ---
 

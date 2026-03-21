@@ -62,6 +62,11 @@ package) only affects new payments going forward — old records stay as they we
 If you mark a student as stopped attending, the app also hides/removes their upcoming sessions
 from the active workflow so no new future teaching records are created by accident.
 
+### Important rule for package students
+
+If a student pays by package, their profile should not keep `pricePerClass` or student-level
+`currency` values. Package payment details are stored on each package purchase record instead.
+
 The debtor flag is not edited manually. The system updates it in batch mode:
 - after 10:00 PM in each student's local timezone, and
 - once at app startup (catch-up), so status is corrected after downtime.
@@ -166,6 +171,12 @@ When the student pays, you record the package:
 - An optional description (e.g. "Spring bundle")
 
 The app tracks how many classes are **remaining** in the package.
+
+When recording a package purchase, these fields are required:
+- Total classes
+- Amount paid
+- Currency
+- Payment date
 
 ### Using a package
 
