@@ -42,13 +42,15 @@ public interface StudentApi {
      *
      * @param search an optional name filter; if {@code null} or blank, all students are returned
      * @param debtor optional debtor flag filter; if {@code null}, debtor filtering is not applied
+     * @param packagePricing optional pricing-mode filter; true=PACKAGE, false=PER_CLASS
      * @return a list of {@link StudentResponse} objects
      */
-    @Operation(summary = "List all students", description = "Returns all active students. Pass optional 'search' and 'debtor' params to filter the results.")
+    @Operation(summary = "List all students", description = "Returns all active students. Pass optional 'search', 'debtor', and 'packagePricing' params to filter the results.")
     @GetMapping
     ResponseEntity<List<StudentResponse>> getAllStudents(
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) Boolean debtor);
+            @RequestParam(required = false) Boolean debtor,
+            @RequestParam(required = false) Boolean packagePricing);
 
     /**
      * Searches active students by student name or payer full name.

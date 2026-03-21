@@ -244,7 +244,7 @@ cached value is used as a fallback.
 | Method | Path                        | Description                        |
 |--------|-----------------------------|------------------------------------|
 | POST   | `/api/students`             | Create a student                   |
-| GET    | `/api/students`             | List all; optional `search` + `debtor` filters |
+| GET    | `/api/students`             | List all; optional `search` + `debtor` + `packagePricing` filters |
 | GET    | `/api/students/search`      | Search by student or payer name    |
 | GET    | `/api/students/{id}`        | Get one student                    |
 | PATCH  | `/api/students/{id}`        | Update student (partial)           |
@@ -253,6 +253,7 @@ cached value is used as a fallback.
 `GET /api/students` query rules:
 - `search` is optional (case-insensitive match by student first/last name).
 - `debtor` is optional boolean (`true` or `false`).
+- `packagePricing` is optional boolean (`true` = `PACKAGE`, `false` = `PER_CLASS`).
 - If both are provided, both filters are applied (`AND`).
 
 Examples:
@@ -260,7 +261,9 @@ Examples:
 GET /api/students
 GET /api/students?debtor=true
 GET /api/students?debtor=false
+GET /api/students?packagePricing=true
 GET /api/students?search=petrov&debtor=true
+GET /api/students?search=petrov&debtor=true&packagePricing=true
 ```
 
 `GET /api/students/search` query rules:
@@ -383,7 +386,7 @@ Student-scoped list behaviour:
 | GET    | `/api/sessions/{id}`                    | Get session details                                              |
 | PUT    | `/api/sessions/{id}`                    | Update date/time/duration/status/payment/note in one request     |
 | POST   | `/api/sessions/{id}/cancel`             | Cancel session (optionally keep payment)                         |
-| POST   | `/api/sessions/{id}/pay`                | Mark as paid (auto-deducts from active package for PACKAGE type) |
+| POST   | `/api/sessions/{id}/pay`                | Mark as paid (requires `paymentDateTime`)                        |
 | POST   | `/api/sessions/{id}/completion`         | Set completion state via `?completed=true\|false`               |
 | POST   | `/api/sessions/{id}/cancel-payment`     | Revert payment (→ UNPAID or return slot to package)              |
 
@@ -392,9 +395,12 @@ Student-scoped list behaviour:
 { "keepAsPaid": false, "note": "Student cancelled last minute" }
 ```
 
-**Pay (PER_CLASS with optional price override):**
+**Pay (requires payment timestamp; optional per-class amount override):**
 ```json
-{ "amountOverride": 30.00 }
+{
+  "paymentDateTime": "2026-04-20T18:30:00",
+  "amountOverride": 30.00
+}
 ```
 
 **Unified update (`PUT /api/sessions/{id}`):**
@@ -405,10 +411,13 @@ Student-scoped list behaviour:
   "durationMinutes": 60,
   "status": "COMPLETED",
   "paid": true,
+  "paymentDateTime": "2026-04-20T18:30:00",
   "amountOverride": 30.00,
   "note": "Conducted and paid"
 }
 ```
+
+When a session is paid, the API stores `paymentDateTime` exactly as sent and returns it in session responses.
 
 **Set completion state:**
 ```
@@ -462,11 +471,13 @@ Each day entry includes:
 |--------|----------------------|------------------------------------------------|
 | GET    | `/api/earnings/daily`   | Selected-period earnings + daily breakdown  |
 | GET    | `/api/earnings/monthly` | Monthly summary with optional base currency |
+| GET    | `/api/earnings/payments`| Paginated unified payment feed              |
 
 Query parameters:
 - `from`, `to` — date range (`YYYY-MM-DD`)
 - `year`, `month` — for monthly endpoint
 - `baseCurrency` — `EUROS` | `DOLLARS` | `RUBLES` (optional; returns a normalised total)
+- `page`, `size` — for `/api/earnings/payments` pagination (defaults: `0`, `20`)
 
 `/api/earnings/daily` returns a period object with:
 - `dailyBreakdown` (per-day rows for `PAID` per-class sessions)
@@ -480,6 +491,10 @@ To get **weekly earnings**, call `/api/earnings/daily` with any 7-day range.
 
 **Monthly earnings** include both per-class session payments **and** package purchase payments
 (matched by `paymentDate` within the month).
+
+`/api/earnings/payments` returns all payments from newest to oldest, including:
+- per-class paid sessions (`paymentType=SESSION`, uses session `paymentDateTime`)
+- package purchases (`paymentType=PACKAGE`, uses package `paymentDate` at `00:00`)
 
 ---
 

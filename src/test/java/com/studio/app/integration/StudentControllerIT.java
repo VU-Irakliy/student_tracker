@@ -78,6 +78,34 @@ class StudentControllerIT extends BaseIntegrationTest {
                     .andExpect(jsonPath("$", hasSize(1)))
                     .andExpect(jsonPath("$[0].firstName").value("Ivan"));
         }
+
+        @Test
+        void shouldReturnOnlyPackagePricingStudents_whenPackagePricingTrue() throws Exception {
+            mockMvc.perform(get("/api/students").param("packagePricing", "true"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(1)))
+                    .andExpect(jsonPath("$[0].firstName").value("Ivan"))
+                    .andExpect(jsonPath("$[0].pricingType").value("PACKAGE"));
+        }
+
+        @Test
+        void shouldReturnOnlyPerClassStudents_whenPackagePricingFalse() throws Exception {
+            mockMvc.perform(get("/api/students").param("packagePricing", "false"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(2)))
+                    .andExpect(jsonPath("$[*].firstName", containsInAnyOrder("Ana", "John")));
+        }
+
+        @Test
+        void shouldApplySearchDebtorAndPackagePricingTogether() throws Exception {
+            mockMvc.perform(get("/api/students")
+                            .param("search", "Petrov")
+                            .param("debtor", "true")
+                            .param("packagePricing", "true"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(1)))
+                    .andExpect(jsonPath("$[0].firstName").value("Ivan"));
+        }
     }
 
     @Nested

@@ -29,6 +29,10 @@ CREATE INDEX IF NOT EXISTS idx_class_sessions_date
     ON studio.class_sessions (class_date)
     WHERE deleted = FALSE;
 
+CREATE INDEX IF NOT EXISTS idx_class_sessions_paid_feed
+    ON studio.class_sessions (payment_date_time DESC)
+    WHERE deleted = FALSE AND payment_status = 'PAID';
+
 -- ── package_purchases ───────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_package_purchases_student
     ON studio.package_purchases (student_id)
@@ -37,6 +41,10 @@ CREATE INDEX IF NOT EXISTS idx_package_purchases_student
 CREATE INDEX IF NOT EXISTS idx_package_purchases_remaining
     ON studio.package_purchases (student_id, classes_remaining)
     WHERE deleted = FALSE AND classes_remaining > 0;
+
+CREATE INDEX IF NOT EXISTS idx_package_purchases_payment_date
+    ON studio.package_purchases (payment_date DESC)
+    WHERE deleted = FALSE;
 
 -- ── payers ──────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_payers_student

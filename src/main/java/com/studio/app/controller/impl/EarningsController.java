@@ -2,10 +2,13 @@ package com.studio.app.controller.impl;
 
 import com.studio.app.controller.EarningsApi;
 import com.studio.app.dto.response.MonthlyEarningsResponse;
+import com.studio.app.dto.response.PaymentRecordResponse;
 import com.studio.app.dto.response.PeriodEarningsResponse;
 import com.studio.app.enums.Currency;
 import com.studio.app.service.EarningsService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -36,6 +39,12 @@ public class EarningsController implements EarningsApi {
                                                                        int month,
                                                                        Currency baseCurrency) {
         return ResponseEntity.ok(earningsService.getMonthlyEarnings(YearMonth.of(year, month), baseCurrency));
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public ResponseEntity<Page<PaymentRecordResponse>> getAllPayments(int page, int size) {
+        return ResponseEntity.ok(earningsService.getAllPayments(PageRequest.of(page, size)));
     }
 }
 

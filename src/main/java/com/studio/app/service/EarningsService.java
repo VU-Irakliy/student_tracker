@@ -1,8 +1,11 @@
 package com.studio.app.service;
 
 import com.studio.app.dto.response.MonthlyEarningsResponse;
+import com.studio.app.dto.response.PaymentRecordResponse;
 import com.studio.app.dto.response.PeriodEarningsResponse;
 import com.studio.app.enums.Currency;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -35,5 +38,13 @@ public interface EarningsService {
      * @return aggregated monthly earnings
      */
     MonthlyEarningsResponse getMonthlyEarnings(YearMonth month, Currency baseCurrency);
+
+    /**
+     * Returns all recorded payments (per-class session payments + package purchases), paginated.
+     *
+     * @param pageable pagination request
+     * @return page of payment records ordered from newest to oldest
+     */
+    Page<PaymentRecordResponse> getAllPayments(Pageable pageable);
 }
 

@@ -85,12 +85,12 @@ public interface ClassSessionService {
     /**
      * Marks a session as paid.
      * <ul>
-     *   <li>{@code PER_CLASS} students: marks as {@code PAID}, with optional amount override.</li>
-     *   <li>{@code PACKAGE} students: auto-deducts from the oldest active package (FIFO).</li>
+     *   <li>{@code PER_CLASS} students: {@code paymentDateTime} is required; marks as {@code PAID}, with optional amount override.</li>
+     *   <li>{@code PACKAGE} students: auto-deducts from the oldest active package (FIFO); {@code paymentDateTime} is optional.</li>
      * </ul>
      *
      * @param sessionId the session ID
-     * @param request   optional amount override (PER_CLASS only)
+     * @param request   payment payload
      * @return the updated session
      */
     default ClassSessionResponse markSessionPaid(Long sessionId, PaySessionRequest request) {

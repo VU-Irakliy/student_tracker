@@ -8,6 +8,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 /**
@@ -43,6 +44,9 @@ public class UpdateSessionRequest {
     /** Optional per-class amount override when paid=true. */
     @Positive(message = "Override amount must be positive")
     private BigDecimal amountOverride;
+
+    /** Required when paid=true for PER_CLASS: date-time when payment happened. */
+    private LocalDateTime paymentDateTime;
 
     /** Optional note attached to the session. */
     private String note;

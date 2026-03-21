@@ -12,6 +12,36 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class EarningsControllerIT extends BaseIntegrationTest {
 
     @Nested
+    class PaymentsFeed {
+
+        @Test
+        void shouldReturnPaginatedPaymentsAcrossSessionsAndPackages() throws Exception {
+            mockMvc.perform(get("/api/earnings/payments")
+                            .param("page", "0")
+                            .param("size", "2"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content", hasSize(2)))
+                    .andExpect(jsonPath("$.totalElements").value(5))
+                    .andExpect(jsonPath("$.totalPages").value(3))
+                    .andExpect(jsonPath("$.content[0].paymentType").value("SESSION"))
+                    .andExpect(jsonPath("$.content[0].sessionId").isNumber())
+                    .andExpect(jsonPath("$.content[0].paymentDateTime").value("2026-03-10T17:00:00"));
+        }
+
+        @Test
+        void shouldIncludePackagePurchasesInPaymentsFeed() throws Exception {
+            mockMvc.perform(get("/api/earnings/payments")
+                            .param("page", "2")
+                            .param("size", "2"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content", hasSize(1)))
+                    .andExpect(jsonPath("$.content[0].paymentType").value("PACKAGE"))
+                    .andExpect(jsonPath("$.content[0].packagePurchaseId").isNumber())
+                    .andExpect(jsonPath("$.content[0].sessionId").isEmpty());
+        }
+    }
+
+    @Nested
     class DailyEarnings {
 
         @Test

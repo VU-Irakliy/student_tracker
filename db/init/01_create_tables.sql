@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS studio.class_sessions (
     status              VARCHAR(50)     NOT NULL DEFAULT 'SCHEDULED',  -- SCHEDULED | COMPLETED | CANCELLED | MOVED
     payment_status      VARCHAR(50)     NOT NULL DEFAULT 'UNPAID',     -- UNPAID | PAID | PACKAGE | REFUNDED
     price_charged       NUMERIC(10, 2),
+    payment_date_time   TIMESTAMP,
     package_purchase_id BIGINT          REFERENCES studio.package_purchases(id),
     is_one_off          BOOLEAN         NOT NULL DEFAULT FALSE,
     note                VARCHAR(255),

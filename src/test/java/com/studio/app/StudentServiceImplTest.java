@@ -281,6 +281,19 @@ class StudentServiceImplTest {
         }
 
         @Test
+        void getAllStudents_shouldFilterByPackagePricing_whenParamPresent() {
+            activeStudent.setPricingType(PricingType.PACKAGE);
+            when(studentRepository.findAllByDeletedFalse()).thenReturn(List.of(activeStudent));
+            when(studentMapper.toResponse(activeStudent)).thenReturn(studentResponse);
+            when(currencyConversionService.convertToAll(any(), any())).thenReturn(Collections.emptyMap());
+
+            var result = studentService.getAllStudents(null, true);
+
+            assertThat(result).hasSize(1);
+            verify(studentRepository).findAllByDeletedFalse();
+        }
+
+        @Test
         void searchStudents_shouldDelegateToRepository() {
             when(studentRepository.searchByName("Ana")).thenReturn(List.of(activeStudent));
             when(studentMapper.toResponse(activeStudent)).thenReturn(studentResponse);
@@ -303,6 +316,19 @@ class StudentServiceImplTest {
             assertThat(result).hasSize(1);
             verify(studentRepository).searchByNameAndDebtor("Ana", true);
             verify(studentRepository, never()).searchByName("Ana");
+        }
+
+        @Test
+        void searchStudents_shouldApplyPackagePricingFilter_whenPresent() {
+            activeStudent.setPricingType(PricingType.PACKAGE);
+            when(studentRepository.searchByName("Ana")).thenReturn(List.of(activeStudent));
+            when(studentMapper.toResponse(activeStudent)).thenReturn(studentResponse);
+            when(currencyConversionService.convertToAll(any(), any())).thenReturn(Collections.emptyMap());
+
+            var result = studentService.searchStudents("Ana", null, true);
+
+            assertThat(result).hasSize(1);
+            verify(studentRepository).searchByName("Ana");
         }
 
         @Test

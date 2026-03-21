@@ -27,10 +27,10 @@ public class StudentController implements StudentApi {
 
     /** {@inheritDoc} */
     @Override
-    public ResponseEntity<List<StudentResponse>> getAllStudents(String search, Boolean debtor) {
+    public ResponseEntity<List<StudentResponse>> getAllStudents(String search, Boolean debtor, Boolean packagePricing) {
         var result = (search != null && !search.isBlank())
-                ? studentService.searchStudents(search, debtor)
-                : studentService.getAllStudents(debtor);
+                ? studentService.searchStudents(search, debtor, packagePricing)
+                : studentService.getAllStudents(debtor, packagePricing);
         return ResponseEntity.ok(result);
     }
 

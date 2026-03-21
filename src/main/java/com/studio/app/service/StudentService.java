@@ -35,6 +35,15 @@ public interface StudentService {
     List<StudentResponse> getAllStudents(Boolean debtor);
 
     /**
+     * Returns active students with optional debtor and pricing-mode filters.
+     *
+     * @param debtor debtor flag filter; when {@code null}, no debtor filtering is applied
+     * @param packagePricing pricing filter; true=PACKAGE, false=PER_CLASS, null=no pricing filter
+     * @return list of student responses
+     */
+    List<StudentResponse> getAllStudents(Boolean debtor, Boolean packagePricing);
+
+    /**
      * Returns a student by ID.
      *
      * @param id the student ID
@@ -74,6 +83,16 @@ public interface StudentService {
      * @return matched students
      */
     List<StudentResponse> searchStudents(String query, Boolean debtor);
+
+    /**
+     * Searches students by partial name match with optional debtor and pricing-mode filters.
+     *
+     * @param query the search string
+     * @param debtor debtor flag filter; when {@code null}, no debtor filtering is applied
+     * @param packagePricing pricing filter; true=PACKAGE, false=PER_CLASS, null=no pricing filter
+     * @return matched students
+     */
+    List<StudentResponse> searchStudents(String query, Boolean debtor, Boolean packagePricing);
 
     /**
      * Searches active students by either student name or payer full name (case-insensitive).

@@ -4,10 +4,11 @@ import jakarta.validation.constraints.Positive;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 /**
  * Request for marking a {@code PER_CLASS} session as paid.
- * No body is strictly required — the price is taken from the session's captured price.
+ * paymentDateTime is strictly required — the price is taken from the session's captured price.
  * This DTO allows overriding the recorded amount if needed.
  */
 @Getter
@@ -16,6 +17,9 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 @Builder
 public class PaySessionRequest {
+
+    /** Date-time when the payment happened (required for PER_CLASS, optional for PACKAGE). */
+    private LocalDateTime paymentDateTime;
 
     /**
      * Optional override for the amount paid.

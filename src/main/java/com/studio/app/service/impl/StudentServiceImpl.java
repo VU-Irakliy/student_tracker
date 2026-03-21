@@ -79,11 +79,19 @@ public class StudentServiceImpl implements StudentService {
     @Override
     @Transactional(readOnly = true)
     public List<StudentResponse> getAllStudents(Boolean debtor) {
+        return getAllStudents(debtor, null);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public List<StudentResponse> getAllStudents(Boolean debtor, Boolean packagePricing) {
         var students = debtor == null
                 ? studentRepository.findAllByDeletedFalse()
                 : studentRepository.findAllByDeletedFalseAndDebtor(debtor);
 
         return students.stream()
+                .filter(student -> matchesPackagePricing(student, packagePricing))
                 .map(this::toResponse)
                 .toList();
     }
@@ -152,11 +160,19 @@ public class StudentServiceImpl implements StudentService {
     @Override
     @Transactional(readOnly = true)
     public List<StudentResponse> searchStudents(String query, Boolean debtor) {
+        return searchStudents(query, debtor, null);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public List<StudentResponse> searchStudents(String query, Boolean debtor, Boolean packagePricing) {
         var students = debtor == null
                 ? studentRepository.searchByName(query)
                 : studentRepository.searchByNameAndDebtor(query, debtor);
 
         return students.stream()
+                .filter(student -> matchesPackagePricing(student, packagePricing))
                 .map(this::toResponse)
                 .toList();
     }
@@ -198,6 +214,15 @@ public class StudentServiceImpl implements StudentService {
                             response.getPricePerClass(), response.getCurrency()));
         }
         return response;
+    }
+
+    private boolean matchesPackagePricing(Student student, Boolean packagePricing) {
+        if (packagePricing == null) {
+            return true;
+        }
+        return packagePricing
+                ? student.getPricingType() == PricingType.PACKAGE
+                : student.getPricingType() == PricingType.PER_CLASS;
     }
 
     private Student findActiveStudent(Long id) {

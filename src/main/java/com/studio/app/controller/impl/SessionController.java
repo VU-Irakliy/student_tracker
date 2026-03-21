@@ -43,8 +43,7 @@ public class SessionController implements SessionApi {
     @Override
     public ResponseEntity<ClassSessionResponse> markPaid(Long sessionId, PaySessionRequest request,
                                                          StudioTimezone timezone) {
-        return ResponseEntity.ok(sessionService.markSessionPaid(sessionId,
-                request != null ? request : new PaySessionRequest(), timezone));
+        return ResponseEntity.ok(sessionService.markSessionPaid(sessionId, request, timezone));
     }
 
     /** {@inheritDoc} */

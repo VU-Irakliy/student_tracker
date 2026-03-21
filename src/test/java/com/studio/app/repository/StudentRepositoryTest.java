@@ -172,6 +172,40 @@ class StudentRepositoryTest {
     }
 
     @Test
+    void findAllByDeletedFalseAndPricingType_returnsOnlyMatchingPricingType() {
+        em.persistAndFlush(Student.builder()
+                .firstName("Ivan").lastName("Petrov")
+                .pricingType(PricingType.PACKAGE)
+                .currency(Currency.RUBLES)
+                .timezone(StudioTimezone.RUSSIA_MOSCOW)
+                .classType(StudentClassType.OGE)
+                .build());
+
+        List<Student> result = studentRepository.findAllByDeletedFalseAndPricingType(PricingType.PACKAGE);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getFirstName()).isEqualTo("Ivan");
+    }
+
+    @Test
+    void searchByNameAndDebtorAndPricingType_appliesAllFilters() {
+        em.persistAndFlush(Student.builder()
+                .firstName("Ana")
+                .lastName("Package")
+                .pricingType(PricingType.PACKAGE)
+                .currency(Currency.EUROS)
+                .timezone(StudioTimezone.SPAIN)
+                .classType(StudentClassType.CASUAL)
+                .debtor(true)
+                .build());
+
+        List<Student> result = studentRepository.searchByNameAndDebtorAndPricingType("ana", true, PricingType.PACKAGE);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getLastName()).isEqualTo("Package");
+    }
+
+    @Test
     void activeStudent_hasCurrencySet() {
         var student = studentRepository.findByIdAndDeletedFalse(activeStudent.getId()).orElseThrow();
         assertThat(student.getCurrency()).isEqualTo(Currency.EUROS);

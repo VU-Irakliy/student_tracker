@@ -15,17 +15,17 @@ INSERT INTO studio.package_purchases (
 
 INSERT INTO studio.class_sessions (
     id, student_id, class_date, start_time, timezone, duration_minutes,
-    status, payment_status, price_charged, currency, package_purchase_id,
+    status, payment_status, price_charged, currency, payment_date_time, package_purchase_id,
     is_one_off, note, created_at, updated_at, deleted
 ) VALUES
-    (10, 1, '2026-03-15', '10:00:00', 'SPAIN', 60, 'SCHEDULED', 'UNPAID', 30.00, 'EUROS', NULL, FALSE, NULL, NOW(), NOW(), FALSE),
-    (11, 1, '2026-03-16', '10:00:00', 'SPAIN', 60, 'SCHEDULED', 'UNPAID', 30.00, 'EUROS', NULL, FALSE, NULL, NOW(), NOW(), FALSE),
-    (12, 1, '2026-03-14', '10:00:00', 'SPAIN', 60, 'SCHEDULED', 'PAID', 30.00, 'EUROS', NULL, FALSE, NULL, NOW(), NOW(), FALSE),
-    (20, 2, '2026-03-15', '10:00:00', 'RUSSIA_MOSCOW', 60, 'SCHEDULED', 'UNPAID', NULL, 'RUBLES', NULL, FALSE, NULL, NOW(), NOW(), FALSE),
-    (22, 2, '2026-03-15', '12:00:00', 'RUSSIA_MOSCOW', 60, 'SCHEDULED', 'PACKAGE', NULL, 'RUBLES', 1, FALSE, NULL, NOW(), NOW(), FALSE),
-    (30, 1, '2026-03-18', '10:00:00', 'SPAIN', 60, 'CANCELLED', 'UNPAID', 30.00, 'EUROS', NULL, FALSE, NULL, NOW(), NOW(), FALSE),
-    (100, 1, '2026-03-20', '09:00:00', 'SPAIN', 90, 'COMPLETED', 'UNPAID', 30.00, 'EUROS', NULL, FALSE, NULL, NOW(), NOW(), FALSE),
-    (101, 1, '2026-03-20', '11:00:00', 'SPAIN', 30, 'SCHEDULED', 'UNPAID', 30.00, 'EUROS', NULL, FALSE, NULL, NOW(), NOW(), FALSE),
-    (102, 1, '2026-03-21', '10:00:00', 'SPAIN', 60, 'COMPLETED', 'UNPAID', 30.00, 'EUROS', NULL, FALSE, NULL, NOW(), NOW(), FALSE),
-    (300, 30, '2026-01-15', '10:00:00', 'RUSSIA_MOSCOW', 60, 'SCHEDULED', 'UNPAID', 40.00, 'RUBLES', NULL, FALSE, NULL, NOW(), NOW(), FALSE);
+    (10, 1, '2026-03-15', '10:00:00', 'SPAIN', 60, 'SCHEDULED', 'UNPAID', 30.00, 'EUROS', NULL, NULL, FALSE, NULL, NOW(), NOW(), FALSE),
+    (11, 1, '2026-03-16', '10:00:00', 'SPAIN', 60, 'SCHEDULED', 'UNPAID', 30.00, 'EUROS', NULL, NULL, FALSE, NULL, NOW(), NOW(), FALSE),
+    (12, 1, '2026-03-14', '10:00:00', 'SPAIN', 60, 'SCHEDULED', 'PAID', 30.00, 'EUROS', '2026-03-14 12:00:00', NULL, FALSE, NULL, NOW(), NOW(), FALSE),
+    (20, 2, '2026-03-15', '10:00:00', 'RUSSIA_MOSCOW', 60, 'SCHEDULED', 'UNPAID', NULL, 'RUBLES', NULL, NULL, FALSE, NULL, NOW(), NOW(), FALSE),
+    (22, 2, '2026-03-15', '12:00:00', 'RUSSIA_MOSCOW', 60, 'SCHEDULED', 'PACKAGE', NULL, 'RUBLES', '2026-03-15 16:00:00', 1, FALSE, NULL, NOW(), NOW(), FALSE),
+    (30, 1, '2026-03-18', '10:00:00', 'SPAIN', 60, 'CANCELLED', 'UNPAID', 30.00, 'EUROS', NULL, NULL, FALSE, NULL, NOW(), NOW(), FALSE),
+    (100, 1, '2026-03-20', '09:00:00', 'SPAIN', 90, 'COMPLETED', 'UNPAID', 30.00, 'EUROS', NULL, NULL, FALSE, NULL, NOW(), NOW(), FALSE),
+    (101, 1, '2026-03-20', '11:00:00', 'SPAIN', 30, 'SCHEDULED', 'UNPAID', 30.00, 'EUROS', NULL, NULL, FALSE, NULL, NOW(), NOW(), FALSE),
+    (102, 1, '2026-03-21', '10:00:00', 'SPAIN', 60, 'COMPLETED', 'UNPAID', 30.00, 'EUROS', NULL, NULL, FALSE, NULL, NOW(), NOW(), FALSE),
+    (300, 30, '2026-01-15', '10:00:00', 'RUSSIA_MOSCOW', 60, 'SCHEDULED', 'UNPAID', 40.00, 'RUBLES', NULL, NULL, FALSE, NULL, NOW(), NOW(), FALSE);
 

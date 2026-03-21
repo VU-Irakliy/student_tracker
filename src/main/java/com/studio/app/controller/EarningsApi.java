@@ -2,10 +2,12 @@ package com.studio.app.controller;
 
 import com.studio.app.constant.ApiConstants;
 import com.studio.app.dto.response.MonthlyEarningsResponse;
+import com.studio.app.dto.response.PaymentRecordResponse;
 import com.studio.app.dto.response.PeriodEarningsResponse;
 import com.studio.app.enums.Currency;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -71,5 +73,16 @@ public interface EarningsApi {
             @RequestParam int year,
             @RequestParam int month,
             @RequestParam(required = false) Currency baseCurrency);
+
+    /**
+     * Returns a paginated feed of all payments.
+     * Includes per-class paid sessions and package purchases.
+     */
+    @Operation(summary = "Get all payments",
+            description = "Returns paginated payment history across per-class session payments and package purchases, newest first.")
+    @GetMapping("/payments")
+    ResponseEntity<Page<PaymentRecordResponse>> getAllPayments(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size);
 }
 

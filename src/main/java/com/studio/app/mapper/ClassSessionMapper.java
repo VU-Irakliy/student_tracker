@@ -17,6 +17,7 @@ public interface ClassSessionMapper {
     @Mapping(target = "studentName",     expression = "java(session.getStudent().getFirstName() + \" \" + session.getStudent().getLastName())")
     @Mapping(target = "packagePurchaseId", source = "packagePurchase.id")
     @Mapping(target = "timezone", source = "timezone")
+    @Mapping(target = "paymentDateTime", source = "paymentDateTime")
     @Mapping(target = "convertedPrices", ignore = true)
     @Mapping(target = "originalClassDate", ignore = true)
     @Mapping(target = "originalStartTime", ignore = true)

@@ -24,6 +24,7 @@ import org.springframework.test.context.jdbc.Sql;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -121,14 +122,18 @@ class ClassSessionServiceImplTest {
 
     @Test
     void shouldTogglePaymentToPaidWithAmountOverride() {
+        var paidAt = LocalDateTime.of(2026, 3, 15, 18, 30);
+
         sessionService.updateSession(10L, UpdateSessionRequest.builder()
                 .paid(true)
                 .amountOverride(new BigDecimal("28.00"))
+                .paymentDateTime(paidAt)
                 .build(), StudioTimezone.SPAIN);
 
         var persisted = sessionRepository.findByIdAndDeletedFalse(10L).orElseThrow();
         assertThat(persisted.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
         assertThat(persisted.getPriceCharged()).isEqualByComparingTo("28.00");
+        assertThat(persisted.getPaymentDateTime()).isEqualTo(paidAt);
     }
 
     @Test
@@ -169,13 +174,27 @@ class ClassSessionServiceImplTest {
 
     @Test
     void shouldMarkPackageStudentSessionAsPaidUsingOldestActivePackage() {
-        sessionService.markSessionPaid(20L, PaySessionRequest.builder().build(), StudioTimezone.SPAIN);
+        var paidAt = LocalDateTime.of(2026, 3, 15, 19, 0);
+
+        sessionService.markSessionPaid(20L, PaySessionRequest.builder()
+                .paymentDateTime(paidAt)
+                .build(), StudioTimezone.SPAIN);
 
         var session = sessionRepository.findByIdAndDeletedFalse(20L).orElseThrow();
         var pkg = packageRepository.findByIdAndDeletedFalse(1L).orElseThrow();
         assertThat(session.getPaymentStatus()).isEqualTo(PaymentStatus.PACKAGE);
         assertThat(session.getPackagePurchase().getId()).isEqualTo(1L);
+        assertThat(session.getPaymentDateTime()).isEqualTo(paidAt);
         assertThat(pkg.getClassesRemaining()).isEqualTo(7);
+    }
+
+    @Test
+    void shouldAllowPackagePaymentWithoutPaymentDateTime() {
+        sessionService.markSessionPaid(20L, PaySessionRequest.builder().build(), StudioTimezone.SPAIN);
+
+        var session = sessionRepository.findByIdAndDeletedFalse(20L).orElseThrow();
+        assertThat(session.getPaymentStatus()).isEqualTo(PaymentStatus.PACKAGE);
+        assertThat(session.getPaymentDateTime()).isEqualTo(LocalDateTime.of(2026, 3, 1, 0, 0));
     }
 
     @Test
@@ -186,7 +205,9 @@ class ClassSessionServiceImplTest {
             packageRepository.save(pkg);
         });
 
-        assertThatThrownBy(() -> sessionService.markSessionPaid(20L, PaySessionRequest.builder().build(), StudioTimezone.SPAIN))
+        assertThatThrownBy(() -> sessionService.markSessionPaid(20L, PaySessionRequest.builder()
+                .paymentDateTime(LocalDateTime.of(2026, 3, 15, 19, 0))
+                .build(), StudioTimezone.SPAIN))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("no active package assigned");
 
@@ -237,6 +258,15 @@ class ClassSessionServiceImplTest {
         assertThatThrownBy(() -> sessionService.cancelSession(30L, CancelSessionRequest.builder().build(), StudioTimezone.SPAIN))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("already cancelled");
+    }
+
+    @Test
+    void shouldRequirePaymentDateTimeWhenMarkingPaid() {
+        assertThatThrownBy(() -> sessionService.updateSession(10L, UpdateSessionRequest.builder()
+                .paid(true)
+                .build(), StudioTimezone.SPAIN))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("paymentDateTime");
     }
 }
 

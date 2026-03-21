@@ -116,6 +116,7 @@ public class DataSnapshotResponse {
         private Long weeklyScheduleId;
         private LocalDate classDate;
         private LocalTime startTime;
+        private LocalDateTime paymentDateTime;
         private StudioTimezone timezone;
         private Integer durationMinutes;
         private ClassStatus status;

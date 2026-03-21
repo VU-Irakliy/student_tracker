@@ -19,18 +19,18 @@ VALUES
     (3, 2, 'TUESDAY',   '14:00', 45, NOW(), NOW(), FALSE);
 
 -- ── Class sessions ──────────────────────────────────────────
-INSERT INTO studio.class_sessions (id, student_id, weekly_schedule_id, class_date, start_time, timezone, duration_minutes, status, payment_status, price_charged, currency, package_purchase_id, is_one_off, note, created_at, updated_at, deleted)
+INSERT INTO studio.class_sessions (id, student_id, weekly_schedule_id, class_date, start_time, timezone, duration_minutes, status, payment_status, price_charged, currency, payment_date_time, package_purchase_id, is_one_off, note, created_at, updated_at, deleted)
 VALUES
     -- Ana: past paid session
-    (1, 1, 1, '2026-03-02', '10:00', 'SPAIN', 60, 'COMPLETED', 'PAID',   30.00, 'EUROS',   NULL, FALSE, NULL,           NOW(), NOW(), FALSE),
+    (1, 1, 1, '2026-03-02', '10:00', 'SPAIN', 60, 'COMPLETED', 'PAID',   30.00, 'EUROS',   '2026-03-02 11:00:00', NULL, FALSE, NULL,           NOW(), NOW(), FALSE),
     -- Ana: today's session, unpaid
-    (2, 1, 2, '2026-03-12', '10:00', 'SPAIN', 60, 'SCHEDULED', 'UNPAID', 30.00, 'EUROS',   NULL, FALSE, NULL,           NOW(), NOW(), FALSE),
+    (2, 1, 2, '2026-03-12', '10:00', 'SPAIN', 60, 'SCHEDULED', 'UNPAID', 30.00, 'EUROS',   NULL,                  NULL, FALSE, NULL,           NOW(), NOW(), FALSE),
     -- Ana: future session
-    (3, 1, 1, '2026-03-16', '10:00', 'SPAIN', 60, 'SCHEDULED', 'UNPAID', 30.00, 'EUROS',   NULL, FALSE, NULL,           NOW(), NOW(), FALSE),
+    (3, 1, 1, '2026-03-16', '10:00', 'SPAIN', 60, 'SCHEDULED', 'UNPAID', 30.00, 'EUROS',   NULL,                  NULL, FALSE, NULL,           NOW(), NOW(), FALSE),
     -- John: paid session on March 5
-    (4, 3, NULL, '2026-03-05', '14:00', 'SPAIN', 60, 'COMPLETED', 'PAID', 40.00, 'DOLLARS', NULL, TRUE,  'Extra class',  NOW(), NOW(), FALSE),
+    (4, 3, NULL, '2026-03-05', '14:00', 'SPAIN', 60, 'COMPLETED', 'PAID', 40.00, 'DOLLARS', '2026-03-05 18:30:00', NULL, TRUE,  'Extra class',  NOW(), NOW(), FALSE),
     -- John: paid session on March 10
-    (5, 3, NULL, '2026-03-10', '14:00', 'SPAIN', 60, 'COMPLETED', 'PAID', 40.00, 'DOLLARS', NULL, TRUE,  NULL,           NOW(), NOW(), FALSE);
+    (5, 3, NULL, '2026-03-10', '14:00', 'SPAIN', 60, 'COMPLETED', 'PAID', 40.00, 'DOLLARS', '2026-03-10 17:00:00', NULL, TRUE,  NULL,           NOW(), NOW(), FALSE);
 
 -- ── Package purchases ───────────────────────────────────────
 INSERT INTO studio.package_purchases (id, student_id, total_classes, classes_remaining, amount_paid, currency, payment_date, description, created_at, updated_at, deleted)

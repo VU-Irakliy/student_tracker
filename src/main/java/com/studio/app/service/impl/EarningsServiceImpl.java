@@ -2,15 +2,19 @@ package com.studio.app.service.impl;
 
 import com.studio.app.dto.response.DailyEarningsResponse;
 import com.studio.app.dto.response.MonthlyEarningsResponse;
+import com.studio.app.dto.response.PaymentRecordResponse;
 import com.studio.app.dto.response.PeriodEarningsResponse;
 import com.studio.app.entity.ClassSession;
 import com.studio.app.entity.PackagePurchase;
 import com.studio.app.enums.Currency;
 import com.studio.app.repository.ClassSessionRepository;
 import com.studio.app.repository.PackagePurchaseRepository;
+import com.studio.app.repository.PaymentFeedRepository;
 import com.studio.app.service.CurrencyConversionService;
 import com.studio.app.service.EarningsService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,6 +51,7 @@ public class EarningsServiceImpl implements EarningsService {
 
     private final ClassSessionRepository sessionRepository;
     private final PackagePurchaseRepository packageRepository;
+    private final PaymentFeedRepository paymentFeedRepository;
     private final CurrencyConversionService currencyConversionService;
 
     /** {@inheritDoc} */
@@ -178,6 +183,12 @@ public class EarningsServiceImpl implements EarningsService {
                 .convertedTotals(convertedTotals)
                 .dailyBreakdown(dailyList)
                 .build();
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public Page<PaymentRecordResponse> getAllPayments(Pageable pageable) {
+        return paymentFeedRepository.findAllPayments(pageable);
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────

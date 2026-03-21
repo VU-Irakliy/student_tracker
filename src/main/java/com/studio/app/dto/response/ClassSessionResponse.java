@@ -8,6 +8,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Map;
 
@@ -65,6 +66,9 @@ public class ClassSessionResponse {
 
     /** Currency of {@code priceCharged}. */
     private Currency currency;
+
+    /** Date-time when this session payment was received. */
+    private LocalDateTime paymentDateTime;
 
     /** The same {@code priceCharged} converted into all supported currencies. */
     private Map<Currency, BigDecimal> convertedPrices;

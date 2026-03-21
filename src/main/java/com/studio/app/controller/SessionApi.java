@@ -67,20 +67,23 @@ public interface SessionApi {
                                                        @RequestParam(defaultValue = "SPAIN") StudioTimezone timezone);
 
     /**
-     * Marks a session as paid. For PER_CLASS students the session is marked as PAID
+     * Marks a session as paid.
+     * For PER_CLASS students client must provide {@code paymentDateTime};
+     * for PACKAGE students it is optional.
+     * PER_CLASS sessions are marked as PAID
      * (with an optional amount override). For PACKAGE students the oldest active
      * package is auto-deducted (FIFO).
      *
      * @param sessionId the ID of the session to pay
-     * @param request   optional payment details (may be {@code null})
+     * @param request   payment details including when the payment happened
      * @return the updated {@link ClassSessionResponse}
      */
     @Operation(summary = "Pay a session",
-            description = "Marks a session as paid. PER_CLASS students: marks as PAID (optional amount override). "
-                    + "PACKAGE students: auto-deducts from the oldest active package (FIFO).")
+            description = "Marks a session as paid. PER_CLASS students: paymentDateTime is required and amountOverride is optional. "
+                    + "PACKAGE students: paymentDateTime is optional and payment is auto-deducted from the oldest active package (FIFO).")
     @PostMapping("/{sessionId}/pay")
     ResponseEntity<ClassSessionResponse> markPaid(@PathVariable Long sessionId,
-                                                  @RequestBody(required = false) PaySessionRequest request,
+                                                  @Valid @RequestBody PaySessionRequest request,
                                                   @RequestParam(defaultValue = "SPAIN") StudioTimezone timezone);
 
     /**

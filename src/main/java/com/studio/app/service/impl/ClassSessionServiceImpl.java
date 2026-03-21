@@ -28,6 +28,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -112,7 +113,7 @@ public class ClassSessionServiceImpl implements ClassSessionService {
 
         if (request.getPaid() != null) {
             if (request.getPaid()) {
-                markPaidInternal(session, request.getAmountOverride());
+                markPaidInternal(session, request.getAmountOverride(), request.getPaymentDateTime());
             } else {
                 markUnpaidInternal(session);
             }
@@ -146,6 +147,7 @@ public class ClassSessionServiceImpl implements ClassSessionService {
             }
             // For per-class paid sessions: revert to unpaid so payment can be moved
             session.setPaymentStatus(PaymentStatus.UNPAID);
+            session.setPaymentDateTime(null);
         }
 
         return toResponse(sessionRepository.save(session), viewerTimezone);
@@ -156,7 +158,11 @@ public class ClassSessionServiceImpl implements ClassSessionService {
     public ClassSessionResponse markSessionPaid(Long sessionId, PaySessionRequest request,
                                                 StudioTimezone viewerTimezone) {
         var session = findActiveSession(sessionId);
-        markPaidInternal(session, request.getAmountOverride());
+        if (request == null) {
+            throw new BadRequestException("payment payload is required");
+        }
+
+        markPaidInternal(session, request.getAmountOverride(), request.getPaymentDateTime());
 
         return toResponse(sessionRepository.save(session), viewerTimezone);
     }
@@ -236,6 +242,7 @@ public class ClassSessionServiceImpl implements ClassSessionService {
         var response = sessionMapper.toResponse(session);
         // Keep timezone explicit in case generated mapper code is stale in local IDE caches.
         response.setTimezone(session.getTimezone());
+        response.setPaymentDateTime(session.getPaymentDateTime());
 
         StudioTimezone sourceTimezone = Optional.ofNullable(session.getTimezone()).orElse(StudioTimezone.SPAIN);
         StudioTimezone effectiveViewerTimezone = Optional.ofNullable(viewerTimezone).orElse(StudioTimezone.SPAIN);
@@ -281,7 +288,9 @@ public class ClassSessionServiceImpl implements ClassSessionService {
                 .orElseThrow(() -> new ResourceNotFoundException("Student", studentId));
     }
 
-    private void markPaidInternal(ClassSession session, java.math.BigDecimal amountOverride) {
+    private void markPaidInternal(ClassSession session,
+                                  java.math.BigDecimal amountOverride,
+                                  LocalDateTime paymentDateTime) {
         var student = session.getStudent();
 
         if (session.getPaymentStatus() == PaymentStatus.PAID
@@ -306,12 +315,21 @@ public class ClassSessionServiceImpl implements ClassSessionService {
 
             session.setPackagePurchase(pkg);
             session.setPaymentStatus(PaymentStatus.PACKAGE);
+            var packagePaidAt = paymentDateTime != null
+                    ? paymentDateTime
+                    : LocalDateTime.of(pkg.getPaymentDate(), LocalTime.MIDNIGHT);
+            session.setPaymentDateTime(packagePaidAt);
             return;
+        }
+
+        if (paymentDateTime == null) {
+            throw new BadRequestException("paymentDateTime is required when marking PER_CLASS session as paid");
         }
 
         // PER_CLASS: use override amount if provided; otherwise keep captured price
         Optional.ofNullable(amountOverride).ifPresent(session::setPriceCharged);
         session.setPaymentStatus(PaymentStatus.PAID);
+        session.setPaymentDateTime(paymentDateTime);
     }
 
     private void markUnpaidInternal(ClassSession session) {
@@ -328,6 +346,7 @@ public class ClassSessionServiceImpl implements ClassSessionService {
         }
 
         session.setPaymentStatus(PaymentStatus.UNPAID);
+        session.setPaymentDateTime(null);
     }
 
     private com.studio.app.entity.PackagePurchase requireLinkedPackageForPackagePaidSession(ClassSession session) {

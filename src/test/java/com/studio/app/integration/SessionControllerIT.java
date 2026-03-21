@@ -221,6 +221,7 @@ class SessionControllerIT extends BaseIntegrationTest {
                                       "durationMinutes": 90,
                                       "status": "COMPLETED",
                                       "paid": true,
+                                      "paymentDateTime": "2026-03-18T18:00:00",
                                       "amountOverride": 35.00,
                                       "note": "Conducted and paid"
                                     }
@@ -231,6 +232,7 @@ class SessionControllerIT extends BaseIntegrationTest {
                     .andExpect(jsonPath("$.durationMinutes").value(90))
                     .andExpect(jsonPath("$.status").value("COMPLETED"))
                     .andExpect(jsonPath("$.paymentStatus").value("PAID"))
+                    .andExpect(jsonPath("$.paymentDateTime").value("2026-03-18T18:00:00"))
                     .andExpect(jsonPath("$.priceCharged").value(35.00))
                     .andExpect(jsonPath("$.note").value("Conducted and paid"));
         }
@@ -244,9 +246,12 @@ class SessionControllerIT extends BaseIntegrationTest {
             // Session 2 is UNPAID for student 1 (PER_CLASS)
             mockMvc.perform(post("/api/sessions/2/pay")
                             .contentType(JSON)
-                            .content("{}"))
+                            .content("""
+                                    { "paymentDateTime": "2026-03-12T19:15:00" }
+                                    """))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.paymentStatus").value("PAID"));
+                    .andExpect(jsonPath("$.paymentStatus").value("PAID"))
+                    .andExpect(jsonPath("$.paymentDateTime").value("2026-03-12T19:15:00"));
         }
 
         @Test
@@ -254,17 +259,31 @@ class SessionControllerIT extends BaseIntegrationTest {
             mockMvc.perform(post("/api/sessions/2/pay")
                             .contentType(JSON)
                             .content("""
-                                    { "amountOverride": 25.00 }
+                                    {
+                                      "paymentDateTime": "2026-03-12T20:00:00",
+                                      "amountOverride": 25.00
+                                    }
                                     """))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.paymentStatus").value("PAID"))
-                    .andExpect(jsonPath("$.priceCharged").value(25.00));
+                    .andExpect(jsonPath("$.priceCharged").value(25.00))
+                    .andExpect(jsonPath("$.paymentDateTime").value("2026-03-12T20:00:00"));
         }
 
         @Test
         void shouldReturn400WhenAlreadyPaid() throws Exception {
             // Session 1 is already PAID
             mockMvc.perform(post("/api/sessions/1/pay")
+                            .contentType(JSON)
+                            .content("""
+                                    { "paymentDateTime": "2026-03-13T10:00:00" }
+                                    """))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        void shouldReturn400WhenPaymentDateTimeMissing() throws Exception {
+            mockMvc.perform(post("/api/sessions/2/pay")
                             .contentType(JSON)
                             .content("{}"))
                     .andExpect(status().isBadRequest());
@@ -381,7 +400,10 @@ class SessionControllerIT extends BaseIntegrationTest {
             mockMvc.perform(post("/api/sessions/{id}/pay", targetSessionId.longValue())
                             .contentType(JSON)
                             .content("""
-                                    { "amountOverride": 30.00 }
+                                    {
+                                      "paymentDateTime": "2026-03-20T18:45:00",
+                                      "amountOverride": 30.00
+                                    }
                                     """))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.paymentStatus").value("PAID"))

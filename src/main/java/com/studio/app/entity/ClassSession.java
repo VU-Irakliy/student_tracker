@@ -9,6 +9,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 /**
@@ -98,6 +99,10 @@ public class ClassSession extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "currency")
     private Currency currency;
+
+    /** Date and time when this session payment was received (timezone-agnostic local timestamp). */
+    @Column(name = "payment_date_time")
+    private LocalDateTime paymentDateTime;
 
     /**
      * Package purchase this session is deducted from.
