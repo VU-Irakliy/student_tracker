@@ -7,7 +7,7 @@
 INSERT INTO studio.students (id, first_name, last_name, phone_number, pricing_type, price_per_class, currency, timezone, class_type, start_date, holiday_mode, holiday_from, holiday_to, stopped_attending, notes, debtor, created_at, updated_at, deleted)
 VALUES
     (1, 'Ana',   'García',  '+34600111222', 'PER_CLASS', 30.00, 'EUROS',   'SPAIN',          'EGE',    NULL, FALSE, NULL, NULL, FALSE, 'Intermediate level', FALSE, NOW(), NOW(), FALSE),
-    (2, 'Ivan',  'Petrov',  '+79001112233', 'PACKAGE',   NULL,  'RUBLES',  'RUSSIA_MOSCOW',  'OGE',    NULL, FALSE, NULL, NULL, FALSE, NULL,                 FALSE, NOW(), NOW(), FALSE),
+    (2, 'Ivan',  'Petrov',  '+79001112233', 'PACKAGE',   NULL,  'RUBLES',  'RUSSIA_MOSCOW',  'OGE',    NULL, FALSE, NULL, NULL, FALSE, NULL,                 TRUE,  NOW(), NOW(), FALSE),
     (3, 'John',  'Smith',   '+12025551234', 'PER_CLASS', 40.00, 'DOLLARS', 'SPAIN',          'IELTS',  NULL, FALSE, NULL, NULL, FALSE, NULL,                 FALSE, NOW(), NOW(), FALSE),
     (4, 'Deleted','User',   NULL,           'PER_CLASS', 25.00, 'EUROS',   'SPAIN',          'CASUAL', NULL, FALSE, NULL, NULL, FALSE, NULL,                 FALSE, NOW(), NOW(), TRUE);
 

@@ -72,7 +72,18 @@ public class StudentServiceImpl implements StudentService {
     @Override
     @Transactional(readOnly = true)
     public List<StudentResponse> getAllStudents() {
-        return studentRepository.findAllByDeletedFalse().stream()
+        return getAllStudents(null);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public List<StudentResponse> getAllStudents(Boolean debtor) {
+        var students = debtor == null
+                ? studentRepository.findAllByDeletedFalse()
+                : studentRepository.findAllByDeletedFalseAndDebtor(debtor);
+
+        return students.stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -134,7 +145,18 @@ public class StudentServiceImpl implements StudentService {
     @Override
     @Transactional(readOnly = true)
     public List<StudentResponse> searchStudents(String query) {
-        return studentRepository.searchByName(query).stream()
+        return searchStudents(query, null);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public List<StudentResponse> searchStudents(String query, Boolean debtor) {
+        var students = debtor == null
+                ? studentRepository.searchByName(query)
+                : studentRepository.searchByNameAndDebtor(query, debtor);
+
+        return students.stream()
                 .map(this::toResponse)
                 .toList();
     }

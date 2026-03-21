@@ -18,6 +18,9 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
     /** Returns all active (non-deleted) students. */
     List<Student> findAllByDeletedFalse();
 
+    /** Returns active students filtered by debtor flag. */
+    List<Student> findAllByDeletedFalseAndDebtor(boolean debtor);
+
     /** Finds a non-deleted student by ID. */
     Optional<Student> findByIdAndDeletedFalse(Long id);
 
@@ -30,6 +33,16 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
                 OR LOWER(s.lastName)  LIKE LOWER(CONCAT('%', :query, '%')))
             """)
     List<Student> searchByName(String query);
+
+    /** Finds non-deleted students by name and debtor flag (case-insensitive). */
+    @Query("""
+            SELECT s FROM Student s
+            WHERE s.deleted = false
+              AND s.debtor = :debtor
+              AND (LOWER(s.firstName) LIKE LOWER(CONCAT('%', :query, '%'))
+                OR LOWER(s.lastName)  LIKE LOWER(CONCAT('%', :query, '%')))
+            """)
+    List<Student> searchByNameAndDebtor(String query, boolean debtor);
 
     /**
      * Finds active students by matching either student full name/parts or active payer full name.

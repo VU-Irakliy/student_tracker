@@ -268,6 +268,19 @@ class StudentServiceImplTest {
         }
 
         @Test
+        void getAllStudents_shouldFilterByDebtor_whenParamPresent() {
+            when(studentRepository.findAllByDeletedFalseAndDebtor(true)).thenReturn(List.of(activeStudent));
+            when(studentMapper.toResponse(activeStudent)).thenReturn(studentResponse);
+            when(currencyConversionService.convertToAll(any(), any())).thenReturn(Collections.emptyMap());
+
+            var result = studentService.getAllStudents(true);
+
+            assertThat(result).hasSize(1);
+            verify(studentRepository).findAllByDeletedFalseAndDebtor(true);
+            verify(studentRepository, never()).findAllByDeletedFalse();
+        }
+
+        @Test
         void searchStudents_shouldDelegateToRepository() {
             when(studentRepository.searchByName("Ana")).thenReturn(List.of(activeStudent));
             when(studentMapper.toResponse(activeStudent)).thenReturn(studentResponse);
@@ -277,6 +290,19 @@ class StudentServiceImplTest {
 
             assertThat(result).hasSize(1);
             verify(studentRepository).searchByName("Ana");
+        }
+
+        @Test
+        void searchStudents_shouldUseDebtorAwareQuery_whenDebtorFilterPresent() {
+            when(studentRepository.searchByNameAndDebtor("Ana", true)).thenReturn(List.of(activeStudent));
+            when(studentMapper.toResponse(activeStudent)).thenReturn(studentResponse);
+            when(currencyConversionService.convertToAll(any(), any())).thenReturn(Collections.emptyMap());
+
+            var result = studentService.searchStudents("Ana", true);
+
+            assertThat(result).hasSize(1);
+            verify(studentRepository).searchByNameAndDebtor("Ana", true);
+            verify(studentRepository, never()).searchByName("Ana");
         }
 
         @Test

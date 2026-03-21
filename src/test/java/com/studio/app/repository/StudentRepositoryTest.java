@@ -41,6 +41,7 @@ class StudentRepositoryTest {
                 .currency(Currency.EUROS)
                 .timezone(StudioTimezone.SPAIN)
                 .classType(StudentClassType.EGE)
+                .debtor(true)
                 .build());
 
         deletedStudent = Student.builder()
@@ -120,6 +121,25 @@ class StudentRepositoryTest {
     }
 
     @Test
+    void searchByNameAndDebtor_appliesBothFilters() {
+        em.persistAndFlush(Student.builder()
+                .firstName("Ana")
+                .lastName("Petrova")
+                .pricingType(PricingType.PER_CLASS)
+                .pricePerClass(new BigDecimal("20.00"))
+                .currency(Currency.EUROS)
+                .timezone(StudioTimezone.SPAIN)
+                .classType(StudentClassType.CASUAL)
+                .debtor(false)
+                .build());
+
+        List<Student> result = studentRepository.searchByNameAndDebtor("ana", true);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getId()).isEqualTo(activeStudent.getId());
+    }
+
+    @Test
     void findAllByDeletedFalse_returnsMultipleActiveStudents() {
         em.persistAndFlush(Student.builder()
                 .firstName("Ivan").lastName("Petrov")
@@ -131,6 +151,24 @@ class StudentRepositoryTest {
 
         List<Student> result = studentRepository.findAllByDeletedFalse();
         assertThat(result).hasSize(2);
+    }
+
+    @Test
+    void findAllByDeletedFalseAndDebtor_returnsOnlyDebtors() {
+        em.persistAndFlush(Student.builder()
+                .firstName("Ivan").lastName("Petrov")
+                .pricingType(PricingType.PER_CLASS)
+                .pricePerClass(new BigDecimal("20.00"))
+                .currency(Currency.EUROS)
+                .timezone(StudioTimezone.SPAIN)
+                .classType(StudentClassType.CASUAL)
+                .debtor(false)
+                .build());
+
+        List<Student> result = studentRepository.findAllByDeletedFalseAndDebtor(true);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getId()).isEqualTo(activeStudent.getId());
     }
 
     @Test

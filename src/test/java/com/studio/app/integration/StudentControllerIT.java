@@ -51,6 +51,33 @@ class StudentControllerIT extends BaseIntegrationTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$", hasSize(0)));
         }
+
+        @Test
+        void shouldReturnOnlyDebtors_whenDebtorParamTrue() throws Exception {
+            mockMvc.perform(get("/api/students").param("debtor", "true"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(1)))
+                    .andExpect(jsonPath("$[0].firstName").value("Ivan"))
+                    .andExpect(jsonPath("$[0].debtor").value(true));
+        }
+
+        @Test
+        void shouldReturnOnlyNonDebtors_whenDebtorParamFalse() throws Exception {
+            mockMvc.perform(get("/api/students").param("debtor", "false"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(2)))
+                    .andExpect(jsonPath("$[*].firstName", containsInAnyOrder("Ana", "John")));
+        }
+
+        @Test
+        void shouldApplySearchAndDebtorFilterTogether() throws Exception {
+            mockMvc.perform(get("/api/students")
+                            .param("search", "Petrov")
+                            .param("debtor", "true"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(1)))
+                    .andExpect(jsonPath("$[0].firstName").value("Ivan"));
+        }
     }
 
     @Nested
