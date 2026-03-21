@@ -244,11 +244,24 @@ cached value is used as a fallback.
 | Method | Path                        | Description                        |
 |--------|-----------------------------|------------------------------------|
 | POST   | `/api/students`             | Create a student                   |
-| GET    | `/api/students`             | List all; `?search=name` to filter |
+| GET    | `/api/students`             | List all; optional `search` + `debtor` filters |
 | GET    | `/api/students/search`      | Search by student or payer name    |
 | GET    | `/api/students/{id}`        | Get one student                    |
 | PATCH  | `/api/students/{id}`        | Update student (partial)           |
 | DELETE | `/api/students/{id}`        | Soft-delete student + related data |
+
+`GET /api/students` query rules:
+- `search` is optional (case-insensitive match by student first/last name).
+- `debtor` is optional boolean (`true` or `false`).
+- If both are provided, both filters are applied (`AND`).
+
+Examples:
+```http
+GET /api/students
+GET /api/students?debtor=true
+GET /api/students?debtor=false
+GET /api/students?search=petrov&debtor=true
+```
 
 `GET /api/students/search` query rules:
 - `query` is required and must be non-blank.
