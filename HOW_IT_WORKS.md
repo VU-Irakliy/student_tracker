@@ -62,6 +62,15 @@ package) only affects new payments going forward — old records stay as they we
 If you mark a student as stopped attending, the app also hides/removes their upcoming sessions
 from the active workflow so no new future teaching records are created by accident.
 
+### Finding a student quickly
+
+You can search students in two ways:
+- `GET /api/students?search=...` — filters by the student's own first/last name.
+- `GET /api/students/search?query=...` — searches by student first name, last name, full name,
+  **or** an active payer's full name.
+
+The search is case-insensitive and only returns active (non-deleted) students.
+
 ### Important rule for package students
 
 If a student pays by package, their profile should not keep `pricePerClass` or student-level

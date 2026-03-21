@@ -278,6 +278,25 @@ class StudentServiceImplTest {
             assertThat(result).hasSize(1);
             verify(studentRepository).searchByName("Ana");
         }
+
+        @Test
+        void searchStudentsByStudentOrPayerName_shouldDelegateToRepository() {
+            when(studentRepository.searchByStudentOrPayerName("María")).thenReturn(List.of(activeStudent));
+            when(studentMapper.toResponse(activeStudent)).thenReturn(studentResponse);
+            when(currencyConversionService.convertToAll(any(), any())).thenReturn(Collections.emptyMap());
+
+            var result = studentService.searchStudentsByStudentOrPayerName("  María ");
+
+            assertThat(result).hasSize(1);
+            verify(studentRepository).searchByStudentOrPayerName("María");
+        }
+
+        @Test
+        void searchStudentsByStudentOrPayerName_shouldRejectBlankQuery() {
+            assertThatThrownBy(() -> studentService.searchStudentsByStudentOrPayerName("   "))
+                    .isInstanceOf(BadRequestException.class)
+                    .hasMessageContaining("query is required");
+        }
     }
 
     @Nested

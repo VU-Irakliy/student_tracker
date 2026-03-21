@@ -30,4 +30,23 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
                 OR LOWER(s.lastName)  LIKE LOWER(CONCAT('%', :query, '%')))
             """)
     List<Student> searchByName(String query);
+
+    /**
+     * Finds active students by matching either student full name/parts or active payer full name.
+     */
+    @Query("""
+            SELECT DISTINCT s FROM Student s
+            LEFT JOIN Payer p
+              ON p.student = s
+             AND p.deleted = false
+            WHERE s.deleted = false
+              AND (
+                    LOWER(CONCAT(s.firstName, ' ', s.lastName)) LIKE LOWER(CONCAT('%', :query, '%'))
+                 OR LOWER(s.firstName) LIKE LOWER(CONCAT('%', :query, '%'))
+                 OR LOWER(s.lastName) LIKE LOWER(CONCAT('%', :query, '%'))
+                 OR LOWER(COALESCE(p.fullName, '')) LIKE LOWER(CONCAT('%', :query, '%'))
+              )
+            ORDER BY s.firstName, s.lastName, s.id
+            """)
+    List<Student> searchByStudentOrPayerName(String query);
 }

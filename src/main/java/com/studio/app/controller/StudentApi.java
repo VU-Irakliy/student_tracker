@@ -48,6 +48,17 @@ public interface StudentApi {
     ResponseEntity<List<StudentResponse>> getAllStudents(@RequestParam(required = false) String search);
 
     /**
+     * Searches active students by student name or payer full name.
+     *
+     * @param query case-insensitive search string
+     * @return matched students
+     */
+    @Operation(summary = "Search students by student or payer name",
+            description = "Matches active students by student first/last/full name or active payer full name.")
+    @GetMapping("/search")
+    ResponseEntity<List<StudentResponse>> searchStudentsByStudentOrPayerName(@RequestParam String query);
+
+    /**
      * Returns a single student by their ID.
      *
      * @param id the ID of the student

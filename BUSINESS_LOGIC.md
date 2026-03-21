@@ -39,6 +39,11 @@ Student availability fields:
 - `holidayMode`, `holidayFrom`, `holidayTo` — controls temporary pause in attendance.
 - `stoppedAttending` — blocks new sessions/schedule edits while keeping student visible in API lists.
 
+Student lookup/search:
+- `GET /api/students?search=...` filters by student first/last name.
+- `GET /api/students/search?query=...` searches by student first/last/full name **or** active payer full name.
+- Search is case-insensitive and returns only non-deleted students.
+
 ### Status Enums
 
 **`ClassStatus`** — the status of the class itself:

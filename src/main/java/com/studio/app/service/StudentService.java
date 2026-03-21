@@ -57,4 +57,12 @@ public interface StudentService {
      * @return matched students
      */
     List<StudentResponse> searchStudents(String query);
+
+    /**
+     * Searches active students by either student name or payer full name (case-insensitive).
+     *
+     * @param query the search string
+     * @return matched students
+     */
+    List<StudentResponse> searchStudentsByStudentOrPayerName(String query);
 }

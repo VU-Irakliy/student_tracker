@@ -36,6 +36,12 @@ public class StudentController implements StudentApi {
 
     /** {@inheritDoc} */
     @Override
+    public ResponseEntity<List<StudentResponse>> searchStudentsByStudentOrPayerName(String query) {
+        return ResponseEntity.ok(studentService.searchStudentsByStudentOrPayerName(query));
+    }
+
+    /** {@inheritDoc} */
+    @Override
     public ResponseEntity<StudentResponse> getStudentById(Long id) {
         return ResponseEntity.ok(studentService.getStudentById(id));
     }

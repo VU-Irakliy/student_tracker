@@ -139,6 +139,19 @@ public class StudentServiceImpl implements StudentService {
                 .toList();
     }
 
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public List<StudentResponse> searchStudentsByStudentOrPayerName(String query) {
+        if (query == null || query.isBlank()) {
+            throw new BadRequestException("query is required");
+        }
+
+        return studentRepository.searchByStudentOrPayerName(query.trim()).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
 
     private StudentResponse toResponse(Student student) {
         var response = studentMapper.toResponse(student);

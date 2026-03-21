@@ -245,9 +245,26 @@ cached value is used as a fallback.
 |--------|-----------------------------|------------------------------------|
 | POST   | `/api/students`             | Create a student                   |
 | GET    | `/api/students`             | List all; `?search=name` to filter |
+| GET    | `/api/students/search`      | Search by student or payer name    |
 | GET    | `/api/students/{id}`        | Get one student                    |
 | PATCH  | `/api/students/{id}`        | Update student (partial)           |
 | DELETE | `/api/students/{id}`        | Soft-delete student + related data |
+
+`GET /api/students/search` query rules:
+- `query` is required and must be non-blank.
+- Matching is case-insensitive.
+- Matches active students by:
+  - student first name,
+  - student last name,
+  - student full name (`firstName + " " + lastName`),
+  - active payer `fullName`.
+
+Examples:
+```http
+GET /api/students/search?query=ana
+GET /api/students/search?query=ana%20garcia
+GET /api/students/search?query=olga
+```
 
 **Create / update body (all fields optional on update):**
 ```json

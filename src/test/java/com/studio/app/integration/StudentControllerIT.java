@@ -54,6 +54,33 @@ class StudentControllerIT extends BaseIntegrationTest {
     }
 
     @Nested
+    class SearchStudentsByStudentOrPayerName {
+
+        @Test
+        void shouldMatchStudentName() throws Exception {
+            mockMvc.perform(get("/api/students/search").param("query", "Ana García"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(1)))
+                    .andExpect(jsonPath("$[0].firstName").value("Ana"));
+        }
+
+        @Test
+        void shouldMatchPayerName() throws Exception {
+            mockMvc.perform(get("/api/students/search").param("query", "Olga"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(1)))
+                    .andExpect(jsonPath("$[0].firstName").value("Ivan"));
+        }
+
+        @Test
+        void shouldReturn400ForBlankQuery() throws Exception {
+            mockMvc.perform(get("/api/students/search").param("query", "   "))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message", containsString("query is required")));
+        }
+    }
+
+    @Nested
     class GetStudentById {
 
         @Test

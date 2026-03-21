@@ -1,6 +1,7 @@
 package com.studio.app.repository;
 
 import com.studio.app.entity.Student;
+import com.studio.app.entity.Payer;
 import com.studio.app.enums.Currency;
 import com.studio.app.enums.PricingType;
 import com.studio.app.enums.StudentClassType;
@@ -148,6 +149,53 @@ class StudentRepositoryTest {
     void activeStudent_hasClassTypeSet() {
         var student = studentRepository.findByIdAndDeletedFalse(activeStudent.getId()).orElseThrow();
         assertThat(student.getClassType()).isEqualTo(StudentClassType.EGE);
+    }
+
+    @Test
+    void searchByStudentOrPayerName_matchesStudentFullName() {
+        List<Student> result = studentRepository.searchByStudentOrPayerName("Ana Garcia");
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getId()).isEqualTo(activeStudent.getId());
+    }
+
+    @Test
+    void searchByStudentOrPayerName_matchesActivePayerName() {
+        em.persistAndFlush(Payer.builder()
+                .student(activeStudent)
+                .fullName("Maria Garcia")
+                .phoneNumber("+34600123456")
+                .build());
+
+        List<Student> result = studentRepository.searchByStudentOrPayerName("maria");
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getId()).isEqualTo(activeStudent.getId());
+    }
+
+    @Test
+    void searchByStudentOrPayerName_ignoresDeletedPayerRows() {
+        var deletedPayer = Payer.builder()
+                .student(activeStudent)
+                .fullName("Hidden Parent")
+                .build();
+        deletedPayer.setDeleted(true);
+        em.persistAndFlush(deletedPayer);
+
+        List<Student> result = studentRepository.searchByStudentOrPayerName("hidden");
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void searchByStudentOrPayerName_returnsDistinctStudentWhenMultiplePayersMatch() {
+        em.persistAndFlush(Payer.builder().student(activeStudent).fullName("Alpha Parent").build());
+        em.persistAndFlush(Payer.builder().student(activeStudent).fullName("Alpha Guardian").build());
+
+        List<Student> result = studentRepository.searchByStudentOrPayerName("alpha");
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getId()).isEqualTo(activeStudent.getId());
     }
 }
 
