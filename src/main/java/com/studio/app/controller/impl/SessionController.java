@@ -1,5 +1,6 @@
 package com.studio.app.controller.impl;
 import com.studio.app.controller.SessionApi;
+import com.studio.app.controller.SessionPaymentApi;
 import com.studio.app.dto.request.CancelSessionRequest;
 import com.studio.app.dto.request.PaySessionRequest;
 import com.studio.app.dto.request.UpdateSessionRequest;
@@ -16,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequiredArgsConstructor
-public class SessionController implements SessionApi {
+public class SessionController implements SessionApi, SessionPaymentApi {
     private final ClassSessionService sessionService;
 
     /** {@inheritDoc} */
